@@ -6,7 +6,8 @@
     "dev": "concurrently \"vite\" \"tsx watch server/index.ts\"",
     "build": "vite build",
     "preview": "vite preview",
-    "server": "tsx server/index.ts"
+    "server": "tsx server/index.ts",
+    "start": "tsx server/index.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.4",

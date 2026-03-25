@@ -1,7 +1,11 @@
 import express from 'express'
 import cors from 'cors'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { mysqlRouter, runMySQLQuery, getMySQLTables, getMySQLColumns, testMySQLConnection } from './mysql.js'
 import { postgresRouter, runPostgresQuery, getPostgresTables, getPostgresColumns, testPostgresConnection } from './postgres.js'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const app = express()
 app.use(cors())
@@ -82,6 +86,15 @@ app.post('/api/test-connection', async (req, res) => {
     res.json({ ok: false, error: String(err) })
   }
 })
+
+// In production, Express serves the Vite-built frontend
+if (process.env.NODE_ENV === 'production') {
+  const distPath = path.resolve(__dirname, '../dist')
+  app.use(express.static(distPath))
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'))
+  })
+}
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
