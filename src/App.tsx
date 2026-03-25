@@ -1,3 +1,4 @@
+// src/App.tsx
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Play, Upload, Download, Clock, ChevronLeft, ChevronRight, Database, BarChart2, TableIcon, Star, Sun, Moon } from 'lucide-react'
 import { Editor } from './components/Editor'
@@ -48,7 +49,7 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const runRef = useRef<() => void>(() => {})
 
-  // Initialize default engine
+  // Initialize default engine on first render
   useEffect(() => {
     if (initialized) return
     setInitialized(true)
@@ -144,7 +145,7 @@ export default function App() {
     XLSX.writeFile(wb, `query_results_${Date.now()}.xlsx`)
   }
 
-  // MySQL/MariaDB use backticks, others use double quotes
+  // MySQL/MariaDB use backticks for identifiers; all others use double quotes
   const quoteIdent = useCallback((name: string) =>
     (engine === 'mysql' || engine === 'mariadb') ? `\`${name}\`` : `"${name}"`
   , [engine])
@@ -189,20 +190,40 @@ export default function App() {
       className={`flex flex-col h-screen select-none ${theme === 'dark' ? 'dark' : ''}`}
       style={{ background: 'var(--ide-bg)', color: 'var(--ide-text)' }}
     >
-      {/* Top Toolbar */}
-      <header className="flex items-center gap-2 px-3 py-2 border-b border-[var(--ide-border)] shrink-0" style={{ background: 'var(--ide-surface)' }}>
-        {/* Logo */}
-        <div className="flex items-center gap-2 mr-3">
+      {/* ── Top Toolbar ────────────────────────────────────────────── */}
+      {/*
+        Accessibility notes:
+        - <header> landmark is announced by screen readers as "banner"
+        - Engine selector wrapped in role="group" + aria-label so its
+          purpose is communicated before individual buttons are read
+        - Every icon-only button has an explicit aria-label
+        - aria-pressed reflects toggleable button states
+        - aria-disabled mirrors the disabled prop for AT compatibility
+      */}
+      <header
+        role="banner"
+        className="flex items-center gap-2 px-3 py-2 border-b border-[var(--ide-border)] shrink-0"
+        style={{ background: 'var(--ide-surface)' }}
+      >
+        {/* Logo — presentational, not interactive */}
+        <div className="flex items-center gap-2 mr-3" aria-hidden="true">
           <Database size={18} className="text-blue-400" />
           <span className="font-bold text-sm text-[var(--ide-text)]">SQL IDE</span>
         </div>
 
         {/* Engine Selector */}
-        <div className="flex items-center gap-1 rounded-lg p-0.5 border border-[var(--ide-border)]" style={{ background: 'var(--ide-bg)' }}>
+        <div
+          role="group"
+          aria-label="Database engine"
+          className="flex items-center gap-1 rounded-lg p-0.5 border border-[var(--ide-border)]"
+          style={{ background: 'var(--ide-bg)' }}
+        >
           {(Object.keys(ENGINE_LABELS) as DbEngine[]).map((e) => (
             <button
               key={e}
               onClick={() => handleEngineChange(e)}
+              aria-pressed={engine === e}
+              aria-label={`Switch to ${ENGINE_LABELS[e].label}${ENGINE_LABELS[e].wasm ? ' (runs in browser)' : ''}`}
               className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
                 engine === e
                   ? `${ENGINE_LABELS[e].color} text-white shadow`
@@ -211,7 +232,7 @@ export default function App() {
             >
               {ENGINE_LABELS[e].label}
               {ENGINE_LABELS[e].wasm && (
-                <span className="ml-1 text-[9px] opacity-60">WASM</span>
+                <span className="ml-1 text-[9px] opacity-60" aria-hidden="true">WASM</span>
               )}
             </button>
           ))}
@@ -219,99 +240,148 @@ export default function App() {
 
         <div className="flex-1" />
 
-        {/* Actions */}
+        {/* Run button — has visible label "Run", aria-label adds keyboard shortcut context */}
         <button
           onClick={handleRun}
           disabled={isLoading}
+          aria-label="Run query (Ctrl+Enter)"
+          aria-disabled={isLoading}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors text-white"
         >
-          <Play size={13} fill="currentColor" />
+          <Play size={13} fill="currentColor" aria-hidden="true" />
           Run
-          <span className="text-xs opacity-60 ml-0.5">⌘↵</span>
+          <span className="text-xs opacity-60 ml-0.5" aria-hidden="true">⌘↵</span>
         </button>
 
+        {/* Import button */}
         <button
           onClick={() => fileInputRef.current?.click()}
+          aria-label="Import SQL or SQLite file"
           className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors"
         >
-          <Upload size={13} />
+          <Upload size={13} aria-hidden="true" />
           Import
         </button>
-        <input ref={fileInputRef} type="file" accept=".db,.sqlite,.sqlite3,.sql" className="hidden" onChange={handleImport} />
+        {/* Hidden file input — labelled via the visible button above */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".db,.sqlite,.sqlite3,.sql"
+          className="hidden"
+          aria-hidden="true"
+          tabIndex={-1}
+          onChange={handleImport}
+        />
 
+        {/* Export button */}
         <button
           onClick={handleExportXLSX}
           disabled={!result || !!result.error || !result.columns.length}
+          aria-label="Export query results as XLSX"
+          aria-disabled={!result || !!result.error || !result.columns.length}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors disabled:opacity-40"
         >
-          <Download size={13} />
+          <Download size={13} aria-hidden="true" />
           Export XLSX
         </button>
 
-        {/* Star / save favorite */}
+        {/* Save as favorite — inline name-input flow */}
         {showFavNameInput ? (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1" role="group" aria-label="Save query as favorite">
+            <label htmlFor="fav-name-input" className="sr-only">Favorite name</label>
             <input
+              id="fav-name-input"
               autoFocus
               className="bg-[var(--ide-surface)] border border-yellow-500/60 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-yellow-400 w-44 text-[var(--ide-text)]"
               placeholder="Favorite name…"
               value={favName}
               onChange={e => setFavName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleSaveFavorite(); if (e.key === 'Escape') setShowFavNameInput(false) }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleSaveFavorite()
+                if (e.key === 'Escape') setShowFavNameInput(false)
+              }}
             />
             <button
               onClick={handleSaveFavorite}
               disabled={!favName.trim()}
+              aria-label="Confirm save favorite"
+              aria-disabled={!favName.trim()}
               className="px-2 py-1.5 bg-yellow-600 hover:bg-yellow-500 rounded-lg text-sm disabled:opacity-40"
             >
-              <Star size={13} fill="currentColor" />
+              <Star size={13} fill="currentColor" aria-hidden="true" />
             </button>
-            <button onClick={() => setShowFavNameInput(false)} className="text-[var(--ide-text-3)] hover:text-[var(--ide-text)] px-1">✕</button>
+            <button
+              onClick={() => setShowFavNameInput(false)}
+              aria-label="Cancel saving favorite"
+              className="text-[var(--ide-text-3)] hover:text-[var(--ide-text)] px-1"
+            >
+              {/* Using × character so it degrades gracefully without JS */}
+              <span aria-hidden="true">✕</span>
+            </button>
           </div>
         ) : (
           <button
             onClick={() => setShowFavNameInput(true)}
-            title="Save as favorite"
+            aria-label="Save current query as favorite"
             className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors text-yellow-400 hover:text-yellow-300"
           >
-            <Star size={13} />
+            <Star size={13} aria-hidden="true" />
           </button>
         )}
 
+        {/* History toggle */}
         <button
           onClick={toggleHistory}
+          aria-label={showHistory ? 'Hide history panel' : 'Show history panel'}
+          aria-pressed={showHistory}
+          aria-expanded={showHistory}
+          aria-controls="right-panel"
           className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm transition-colors ${
-            showHistory ? 'bg-blue-600/20 border-blue-500 text-blue-300' : 'bg-[var(--ide-surface2)] border-[var(--ide-border)] hover:bg-[var(--ide-surface3)]'
+            showHistory
+              ? 'bg-blue-600/20 border-blue-500 text-blue-300'
+              : 'bg-[var(--ide-surface2)] border-[var(--ide-border)] hover:bg-[var(--ide-surface3)]'
           }`}
         >
-          <Clock size={13} />
+          <Clock size={13} aria-hidden="true" />
           History
         </button>
 
+        {/* Theme toggle */}
         <button
           onClick={toggleTheme}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors"
-          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
         >
-          {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
+          {theme === 'dark'
+            ? <Sun size={13} aria-hidden="true" />
+            : <Moon size={13} aria-hidden="true" />}
         </button>
       </header>
 
-      {/* Main Content */}
+      {/* ── Main Content ───────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Sidebar toggle button when hidden */}
+
+        {/* Sidebar expand button — only shown when sidebar is hidden */}
         {!showSidebar && (
           <button
             onClick={toggleSidebar}
+            aria-label="Show table explorer"
+            aria-expanded={false}
+            aria-controls="sidebar-panel"
             className="absolute left-0 top-1/2 z-10 -translate-y-1/2 bg-[var(--ide-surface2)] border border-[var(--ide-border)] p-0.5 rounded-r"
           >
-            <ChevronRight size={12} />
+            <ChevronRight size={12} aria-hidden="true" />
           </button>
         )}
 
         {/* Sidebar */}
         {showSidebar && (
-          <div className="w-52 shrink-0 flex flex-col overflow-hidden relative">
+          <div
+            id="sidebar-panel"
+            role="complementary"
+            aria-label="Table explorer"
+            className="w-52 shrink-0 flex flex-col overflow-hidden relative"
+          >
             <Sidebar
               tables={tables}
               engine={engine}
@@ -322,17 +392,26 @@ export default function App() {
             />
             <button
               onClick={toggleSidebar}
+              aria-label="Hide table explorer"
+              aria-expanded={true}
+              aria-controls="sidebar-panel"
               className="absolute top-2 right-2 p-0.5 hover:bg-[var(--ide-surface3)] rounded text-[var(--ide-text-4)] hover:text-[var(--ide-text-2)]"
             >
-              <ChevronLeft size={12} />
+              <ChevronLeft size={12} aria-hidden="true" />
             </button>
           </div>
         )}
 
-        {/* Center panel */}
+        {/* Center panel — editor + results */}
         <div className="flex flex-col flex-1 overflow-hidden">
-          {/* Editor */}
-          <div className="overflow-hidden min-h-0" style={{ flex: '1 1 50%' }}>
+
+          {/* Editor region */}
+          <div
+            role="region"
+            aria-label="SQL editor"
+            className="overflow-hidden min-h-0"
+            style={{ flex: '1 1 50%' }}
+          >
             <Editor
               value={sql}
               onChange={setSql}
@@ -342,36 +421,66 @@ export default function App() {
           </div>
 
           {/* Divider */}
-          <div className="h-px bg-[var(--ide-border)] shrink-0" />
+          <div className="h-px bg-[var(--ide-border)] shrink-0" role="separator" />
 
           {/* Results panel */}
-          <div className="flex flex-col overflow-hidden" style={{ flex: '1 1 50%' }}>
-            {/* Results tabs */}
-            <div className="flex items-center gap-1 px-3 py-1.5 border-b border-[var(--ide-border)] shrink-0" style={{ background: 'var(--ide-surface)' }}>
+          <div
+            role="region"
+            aria-label="Query results"
+            className="flex flex-col overflow-hidden"
+            style={{ flex: '1 1 50%' }}
+          >
+            {/* Results view tabs */}
+            <div
+              role="tablist"
+              aria-label="Result view"
+              className="flex items-center gap-1 px-3 py-1.5 border-b border-[var(--ide-border)] shrink-0"
+              style={{ background: 'var(--ide-surface)' }}
+            >
               <button
+                role="tab"
+                aria-selected={activeResultTab === 'table'}
+                aria-controls="results-tab-panel"
                 onClick={() => setActiveResultTab('table')}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs ${
-                  activeResultTab === 'table' ? 'bg-[var(--ide-surface2)] text-[var(--ide-text)]' : 'text-[var(--ide-text-3)] hover:text-[var(--ide-text-2)]'
+                  activeResultTab === 'table'
+                    ? 'bg-[var(--ide-surface2)] text-[var(--ide-text)]'
+                    : 'text-[var(--ide-text-3)] hover:text-[var(--ide-text-2)]'
                 }`}
               >
-                <TableIcon size={11} /> Table
+                <TableIcon size={11} aria-hidden="true" /> Table
               </button>
               <button
+                role="tab"
+                aria-selected={activeResultTab === 'chart'}
+                aria-controls="results-tab-panel"
                 onClick={() => setActiveResultTab('chart')}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs ${
-                  activeResultTab === 'chart' ? 'bg-[var(--ide-surface2)] text-[var(--ide-text)]' : 'text-[var(--ide-text-3)] hover:text-[var(--ide-text-2)]'
+                  activeResultTab === 'chart'
+                    ? 'bg-[var(--ide-surface2)] text-[var(--ide-text)]'
+                    : 'text-[var(--ide-text-3)] hover:text-[var(--ide-text-2)]'
                 }`}
               >
-                <BarChart2 size={11} /> Chart
+                <BarChart2 size={11} aria-hidden="true" /> Chart
               </button>
+
+              {/* Chart type selector — only visible in chart tab */}
               {activeResultTab === 'chart' && (
-                <div className="flex items-center gap-1 ml-2">
+                <div
+                  role="group"
+                  aria-label="Chart type"
+                  className="flex items-center gap-1 ml-2"
+                >
                   {(['none', 'bar', 'line', 'pie', 'bubble'] as ChartType[]).map((t) => (
                     <button
                       key={t}
                       onClick={() => setChartType(t)}
+                      aria-pressed={chartType === t}
+                      aria-label={`Chart type: ${t}`}
                       className={`px-2 py-0.5 rounded text-xs capitalize ${
-                        chartType === t ? 'bg-blue-600 text-white' : 'text-[var(--ide-text-3)] hover:text-[var(--ide-text-2)]'
+                        chartType === t
+                          ? 'bg-blue-600 text-white'
+                          : 'text-[var(--ide-text-3)] hover:text-[var(--ide-text-2)]'
                       }`}
                     >
                       {t}
@@ -380,11 +489,23 @@ export default function App() {
                 </div>
               )}
             </div>
-            <div className="flex-1 overflow-hidden">
+
+            {/* Results content */}
+            <div
+              id="results-tab-panel"
+              role="tabpanel"
+              aria-label={activeResultTab === 'table' ? 'Results table' : 'Results chart'}
+              className="flex-1 overflow-hidden"
+            >
               {isLoading ? (
-                <div className="flex items-center justify-center h-full text-[var(--ide-text-3)] text-sm gap-2">
-                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                  Executing query...
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="flex items-center justify-center h-full text-[var(--ide-text-3)] text-sm gap-2"
+                >
+                  {/* Spinner is decorative; the text carries the meaning */}
+                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+                  Executing query…
                 </div>
               ) : result ? (
                 activeResultTab === 'table' ? (
@@ -403,10 +524,18 @@ export default function App() {
 
         {/* Right Panel (History + Favorites) */}
         {showHistory && (
-          <div className="w-72 shrink-0 border-l border-[var(--ide-border)] overflow-hidden flex flex-col">
-            {/* Tabs */}
-            <div className="flex border-b border-[var(--ide-border)] shrink-0">
+          <div
+            id="right-panel"
+            role="complementary"
+            aria-label="History and favorites"
+            className="w-72 shrink-0 border-l border-[var(--ide-border)] overflow-hidden flex flex-col"
+          >
+            {/* Panel tabs */}
+            <div role="tablist" aria-label="Panel" className="flex border-b border-[var(--ide-border)] shrink-0">
               <button
+                role="tab"
+                aria-selected={rightPanelTab === 'history'}
+                aria-controls="right-panel-content"
                 onClick={() => setRightPanelTab('history')}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium border-b-2 transition-colors ${
                   rightPanelTab === 'history'
@@ -414,9 +543,12 @@ export default function App() {
                     : 'border-transparent text-[var(--ide-text-3)] hover:text-[var(--ide-text-2)]'
                 }`}
               >
-                <Clock size={11} /> History
+                <Clock size={11} aria-hidden="true" /> History
               </button>
               <button
+                role="tab"
+                aria-selected={rightPanelTab === 'favorites'}
+                aria-controls="right-panel-content"
                 onClick={() => setRightPanelTab('favorites')}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium border-b-2 transition-colors ${
                   rightPanelTab === 'favorites'
@@ -424,13 +556,25 @@ export default function App() {
                     : 'border-transparent text-[var(--ide-text-3)] hover:text-[var(--ide-text-2)]'
                 }`}
               >
-                <Star size={11} /> Favorites
+                <Star size={11} aria-hidden="true" /> Favorites
                 {favoriteQueries.length > 0 && (
-                  <span className="bg-yellow-600/40 text-yellow-300 text-xs px-1.5 rounded-full">{favoriteQueries.length}</span>
+                  <span
+                    className="bg-yellow-600/40 text-yellow-300 text-xs px-1.5 rounded-full"
+                    aria-label={`${favoriteQueries.length} saved favorites`}
+                  >
+                    {favoriteQueries.length}
+                  </span>
                 )}
               </button>
             </div>
-            <div className="flex-1 overflow-hidden">
+
+            {/* Panel content */}
+            <div
+              id="right-panel-content"
+              role="tabpanel"
+              aria-label={rightPanelTab === 'history' ? 'Query history' : 'Favorite queries'}
+              className="flex-1 overflow-hidden"
+            >
               {rightPanelTab === 'history' ? (
                 <QueryHistory
                   history={history}
@@ -449,16 +593,28 @@ export default function App() {
         )}
       </div>
 
-      {/* Status bar */}
-      <footer className="flex items-center gap-3 px-3 py-1 border-t border-[var(--ide-border)] text-xs text-[var(--ide-text-3)] shrink-0" style={{ background: 'var(--ide-surface)' }}>
-        <div className={`w-2 h-2 rounded-full ${ENGINE_LABELS[engine].color}`} />
+      {/* ── Status Bar ─────────────────────────────────────────────── */}
+      <footer
+        role="contentinfo"
+        aria-label="Connection status"
+        className="flex items-center gap-3 px-3 py-1 border-t border-[var(--ide-border)] text-xs text-[var(--ide-text-3)] shrink-0"
+        style={{ background: 'var(--ide-surface)' }}
+      >
+        {/* Engine indicator dot — decorative */}
+        <div className={`w-2 h-2 rounded-full ${ENGINE_LABELS[engine].color}`} aria-hidden="true" />
         <span>{ENGINE_LABELS[engine].label}</span>
-        {ENGINE_LABELS[engine].wasm && <span className="text-[var(--ide-text-4)]">· In-browser (WebAssembly)</span>}
+        {ENGINE_LABELS[engine].wasm && (
+          <span className="text-[var(--ide-text-4)]">· In-browser (WebAssembly)</span>
+        )}
         {remoteConnection && !ENGINE_LABELS[engine].wasm && (
-          <span className="text-[var(--ide-text-4)]">· {remoteConnection.host}:{remoteConnection.port}/{remoteConnection.database}</span>
+          <span className="text-[var(--ide-text-4)]">
+            · {remoteConnection.host}:{remoteConnection.port}/{remoteConnection.database}
+          </span>
         )}
         {result && !result.error && (
-          <span className="ml-auto">{result.rowCount} rows · {result.executionTime.toFixed(2)}ms</span>
+          <span className="ml-auto" aria-live="polite">
+            {result.rowCount} rows · {result.executionTime.toFixed(2)}ms
+          </span>
         )}
       </footer>
 
