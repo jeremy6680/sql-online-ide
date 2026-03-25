@@ -90,6 +90,14 @@ app.post('/api/test-connection', async (req, res) => {
 // In production, Express serves the Vite-built frontend
 if (process.env.NODE_ENV === 'production') {
   const distPath = path.resolve(__dirname, '../dist')
+
+  // Required for DuckDB WASM: enables SharedArrayBuffer in the browser
+  app.use((_req, res, next) => {
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
+    res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp')
+    next()
+  })
+
   app.use(express.static(distPath))
   app.get('*', (_req, res) => {
     res.sendFile(path.join(distPath, 'index.html'))
