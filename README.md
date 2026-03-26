@@ -1,8 +1,9 @@
 # SQL Online IDE
 
-A browser-based SQL IDE supporting multiple database engines — no installation or sign-up required.
-
+A browser-based SQL IDE supporting SQLite, DuckDB, MySQL, MariaDB, and PostgreSQL — no install or sign-up required.
 Inspired by SQLiteOnline, but fully open source and without the limitations of the free tier.
+
+🌐 **Live at [sql.web2data.org](https://sql.web2data.org)**
 
 ## Features
 
@@ -68,12 +69,12 @@ sql-online-ide/
 
 ### Engine details
 
-| Engine | Runs in | Notes |
-|--------|---------|-------|
-| SQLite | Browser (WASM) | [sql.js](https://sql-js.github.io/sql.js/) — full SQLite in WebAssembly |
-| DuckDB | Browser (WASM) | [duckdb-wasm](https://github.com/duckdb/duckdb-wasm) — analytical SQL engine |
-| MySQL / MariaDB | Remote | Proxied via Express + [mysql2](https://github.com/sidorares/node-mysql2) |
-| PostgreSQL | Remote | Proxied via Express + [pg](https://github.com/brianc/node-postgres) |
+| Engine          | Runs in        | Notes                                                                        |
+| --------------- | -------------- | ---------------------------------------------------------------------------- |
+| SQLite          | Browser (WASM) | [sql.js](https://sql-js.github.io/sql.js/) — full SQLite in WebAssembly      |
+| DuckDB          | Browser (WASM) | [duckdb-wasm](https://github.com/duckdb/duckdb-wasm) — analytical SQL engine |
+| MySQL / MariaDB | Remote         | Proxied via Express + [mysql2](https://github.com/sidorares/node-mysql2)     |
+| PostgreSQL      | Remote         | Proxied via Express + [pg](https://github.com/brianc/node-postgres)          |
 
 ## Tech Stack
 
@@ -85,6 +86,8 @@ sql-online-ide/
 - **Backend** — Express, mysql2, pg
 
 ## Deployment
+
+The app is deployed via **Coolify** on a **Hetzner VPS** and served at [sql.web2data.org](https://sql.web2data.org).
 
 ### Docker
 
@@ -99,12 +102,12 @@ docker run -p 3001:3001 -e NODE_ENV=production sql-online-ide
 
 **Server specs (minimum):**
 
-| Resource | Minimum | Recommended |
-|----------|---------|-------------|
-| vCPU | 1 | 2 |
-| RAM | 512 MB | 2 GB |
-| Disk | 10 GB | 20 GB |
-| OS | Ubuntu 22.04+ | Ubuntu 24.04 |
+| Resource | Minimum       | Recommended  |
+| -------- | ------------- | ------------ |
+| vCPU     | 1             | 2            |
+| RAM      | 512 MB        | 2 GB         |
+| Disk     | 10 GB         | 20 GB        |
+| OS       | Ubuntu 22.04+ | Ubuntu 24.04 |
 
 > SQLite and DuckDB run entirely in the browser (WebAssembly) — the server only handles MySQL/MariaDB/PostgreSQL proxy requests. Resource usage is therefore very low.
 
@@ -126,10 +129,10 @@ Coolify handles SSL (Let's Encrypt) and zero-downtime redeploys on each push to 
 
 ### Environment variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
+| Variable   | Default       | Description                                                                 |
+| ---------- | ------------- | --------------------------------------------------------------------------- |
 | `NODE_ENV` | `development` | Set to `production` to serve the built frontend and enable security headers |
-| `PORT` | `3001` | Port the Express server listens on |
+| `PORT`     | `3001`        | Port the Express server listens on                                          |
 
 ### Technical requirements
 
@@ -138,14 +141,17 @@ Both WebAssembly engines (SQLite, DuckDB) and the `crypto.randomUUID()` API requ
 
 **COOP/COEP headers for DuckDB.**
 DuckDB WASM uses `SharedArrayBuffer` for multi-threaded execution. This requires two HTTP headers that the Express server sets automatically in production:
+
 ```
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
+
 Without these, DuckDB falls back to a slower single-threaded mode.
 
 **Database connectivity for MySQL/MariaDB/PostgreSQL.**
 The remote database engines are proxied through the Express backend. The database server must therefore be reachable from the machine running this app — not from the user's browser. Concretely:
+
 - If both this app and the database run on the same VPS, connect via `localhost` or the internal network.
 - If the database is on a separate host, open the relevant port (3306 for MySQL/MariaDB, 5432 for PostgreSQL) in the firewall and allow the VPS IP.
 
@@ -158,4 +164,4 @@ Pull requests are welcome. For major changes, please open an issue first.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) — © 2026 Jeremy Marchandeau
