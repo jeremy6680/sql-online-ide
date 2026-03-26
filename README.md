@@ -7,18 +7,18 @@ Inspired by SQLiteOnline, but fully open source and without the limitations of t
 
 ## Features
 
-- **SQL Editor** — CodeMirror 6 with syntax highlighting, autocompletion, and `Ctrl+Enter` / `Cmd+Enter` to run
-- **Multiple engines** — SQLite, DuckDB, MySQL, MariaDB, PostgreSQL
-- **In-browser execution** — SQLite and DuckDB run entirely via WebAssembly (no server needed)
-- **Table explorer** — browse tables and columns in the sidebar; click a table to preview its data
-- **Drop tables** — delete a table directly from the UI without writing SQL
-- **Query history** — last 100 queries saved locally, click to restore
-- **Favorites** — save and name queries for quick reuse
-- **Saved connections** — store MySQL/MariaDB/PostgreSQL connection configs locally
-- **Charts** — visualize results as bar, line, pie, or bubble charts
-- **Import** — load `.db`, `.sqlite`, `.sqlite3`, or `.sql` files
-- **Export** — download query results as `.xlsx`
-- **Light / dark theme** — Tokyo Night dark theme + clean light mode
+- ✍️ **SQL Editor** — CodeMirror 6 with syntax highlighting, autocompletion, and `Ctrl+Enter` / `Cmd+Enter` to run
+- 🗄️ **Multiple engines** — SQLite, DuckDB, MySQL, MariaDB, PostgreSQL
+- 🖥️ **In-browser execution** — SQLite and DuckDB run entirely via WebAssembly (no server needed)
+- 🔎 **Table explorer** — browse tables and columns in the sidebar; click a table to preview its data
+- 🗑️ **Drop tables** — delete a table directly from the UI without writing SQL
+- 🕘 **Query history** — last 100 queries saved locally, click to restore
+- ⭐ **Favorites** — save and name queries for quick reuse
+- 🔌 **Saved connections** — store MySQL/MariaDB/PostgreSQL connection configs locally
+- 📊 **Charts** — visualize results as bar, line, pie, or bubble charts
+- 📥 **Import** — load `.db`, `.sqlite`, `.sqlite3`, or `.sql` files
+- 📤 **Export** — download query results as `.xlsx`
+- 🌓 **Light / dark theme** — Tokyo Night dark theme + clean light mode
 
 ## Getting Started
 
