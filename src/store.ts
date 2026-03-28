@@ -30,6 +30,7 @@ interface AppState {
 
   // History
   history: HistoryEntry[]
+  setHistory: (entries: HistoryEntry[]) => void
   addHistory: (e: HistoryEntry) => void
   clearHistory: () => void
 
@@ -43,6 +44,7 @@ interface AppState {
 
   // Favorite queries
   favoriteQueries: FavoriteQuery[]
+  setFavoriteQueries: (queries: FavoriteQuery[]) => void
   addFavoriteQuery: (q: FavoriteQuery) => void
   removeFavoriteQuery: (id: string) => void
 
@@ -86,6 +88,7 @@ export const useStore = create<AppState>()(
       setSelectedTable: (selectedTable) => set({ selectedTable }),
 
       history: [],
+      setHistory: (entries) => set({ history: entries }),
       addHistory: (entry) => set((state) => ({
         history: [entry, ...state.history].slice(0, 100)
       })),
@@ -98,6 +101,7 @@ export const useStore = create<AppState>()(
       setChartType: (chartType) => set({ chartType }),
 
       favoriteQueries: [],
+      setFavoriteQueries: (queries) => set({ favoriteQueries: queries }),
       addFavoriteQuery: (q) => set((state) => ({ favoriteQueries: [q, ...state.favoriteQueries] })),
       removeFavoriteQuery: (id) => set((state) => ({ favoriteQueries: state.favoriteQueries.filter(q => q.id !== id) })),
 

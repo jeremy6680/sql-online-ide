@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
+import Anthropic from "@anthropic-ai/sdk";
 import {
   mysqlRouter,
   runMySQLQuery,
@@ -25,6 +26,7 @@ import {
   signToken,
   isAuthEnabled,
 } from "./auth.js";
+import { loadUserData, saveUserData } from "./userData.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -57,8 +59,99 @@ app.post("/api/auth/login", (req, res) => {
 
 // Auth: verify endpoint — lets the frontend check if a stored token is still valid
 // requireAuth is applied here so an expired token returns 401
-app.get("/api/auth/me", requireAuth, (req, res) => {
+app.get("/api/auth/me", requireAuth, (_req, res) => {
   res.json({ ok: true, authEnabled: isAuthEnabled() });
+});
+
+// ─── User data endpoints (auth required) ─────────────────────────────────────
+
+// GET /api/user/data — returns this user's persisted history + favorites
+app.get("/api/user/data", requireAuth, (req, res) => {
+  // When auth is disabled, username is undefined — return empty data
+  const username = req.username ?? "__anonymous__";
+  res.json(loadUserData(username));
+});
+
+// POST /api/user/data — replaces this user's history + favorites
+app.post("/api/user/data", requireAuth, (req, res) => {
+  const username = req.username ?? "__anonymous__";
+  const { history, favoriteQueries } = req.body as {
+    history?: unknown[];
+    favoriteQueries?: unknown[];
+  };
+  const current = loadUserData(username);
+  saveUserData(username, {
+    history: history ?? current.history,
+    favoriteQueries: favoriteQueries ?? current.favoriteQueries,
+  });
+  res.json({ ok: true });
+});
+
+// ─── AI SQL assistant endpoint ────────────────────────────────────────────────
+
+// POST /api/ai/sql — translates a natural-language prompt into SQL
+// Requires ANTHROPIC_API_KEY env var; returns 503 if not configured.
+app.post("/api/ai/sql", requireAuth, async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    res.status(503).json({ error: "AI assistant is not configured (missing ANTHROPIC_API_KEY)." });
+    return;
+  }
+
+  const { prompt, tables, engine } = req.body as {
+    prompt?: string;
+    tables?: { name: string; columns?: { name: string; type: string }[] }[];
+    engine?: string;
+  };
+
+  if (!prompt?.trim()) {
+    res.status(400).json({ error: "prompt is required" });
+    return;
+  }
+
+  const schemaBlock = tables && tables.length > 0
+    ? tables
+        .map((t) => {
+          const cols = t.columns?.map((c) => `  ${c.name} ${c.type}`).join("\n") ?? "";
+          return `Table: ${t.name}\n${cols}`;
+        })
+        .join("\n\n")
+    : "No schema available.";
+
+  const systemPrompt = `You are an expert SQL assistant. The user is working with a ${engine ?? "SQL"} database.
+Here is the current database schema:
+
+${schemaBlock}
+
+Translate the user's natural-language request into a single, valid SQL query.
+Return ONLY the raw SQL — no markdown, no code fences, no explanation.`;
+
+  try {
+    const client = new Anthropic({ apiKey });
+    const message = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1024,
+      messages: [{ role: "user", content: prompt }],
+      system: systemPrompt,
+    });
+
+    const sql = message.content
+      .filter((b) => b.type === "text")
+      .map((b) => (b as { type: "text"; text: string }).text)
+      .join("")
+      .trim();
+
+    res.json({ sql });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── AI status endpoint ───────────────────────────────────────────────────────
+
+// GET /api/ai/status — lets the frontend know if AI is available
+app.get("/api/ai/status", (_req, res) => {
+  res.json({ aiEnabled: !!process.env.ANTHROPIC_API_KEY });
 });
 
 // Mount engine-specific routers

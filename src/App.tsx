@@ -16,6 +16,7 @@ import {
   Network,
   LogIn,
   LogOut,
+  Sparkles,
 } from "lucide-react";
 import { Editor } from "./components/Editor";
 import { ResultsTable } from "./components/ResultsTable";
@@ -26,6 +27,7 @@ import { FavoritesPanel } from "./components/FavoritesPanel";
 import { ConnectionModal } from "./components/ConnectionModal";
 import { SchemaView } from "./components/SchemaView";
 import { LoginModal } from "./components/LoginPage";
+import { AIHelpPanel } from "./components/AIHelpPanel";
 
 import { useStore } from "./store";
 import {
@@ -41,6 +43,8 @@ import type {
   ChartType,
   RemoteConnection,
   SavedConnection,
+  HistoryEntry,
+  FavoriteQuery,
 } from "./types";
 import * as XLSX from "xlsx";
 
@@ -71,6 +75,7 @@ export default function App() {
     tables,
     setTables,
     history,
+    setHistory,
     addHistory,
     clearHistory,
     remoteConnection,
@@ -82,6 +87,7 @@ export default function App() {
     showSidebar,
     toggleSidebar,
     favoriteQueries,
+    setFavoriteQueries,
     addFavoriteQuery,
     removeFavoriteQuery,
     savedConnections,
@@ -102,11 +108,72 @@ export default function App() {
   );
   const [showFavNameInput, setShowFavNameInput] = useState(false);
   const [favName, setFavName] = useState("");
+  const [showAIPanel, setShowAIPanel] = useState(false);
+  const [aiEnabled, setAIEnabled] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const runRef = useRef<() => void>(() => {});
+  // Track whether we have already loaded server data for the current session
+  const serverDataLoadedRef = useRef(false);
 
-  // On load: verify stored token is still valid; detect if auth is enabled
+  // ── Server-side history/favorites sync ──────────────────────────────────────
+
+  const loadServerUserData = useCallback(
+    (token: string) => {
+      if (serverDataLoadedRef.current) return;
+      serverDataLoadedRef.current = true;
+      fetch("/api/user/data", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => res.json())
+        .then((data: { history?: HistoryEntry[]; favoriteQueries?: FavoriteQuery[] }) => {
+          if (Array.isArray(data.history)) setHistory(data.history);
+          if (Array.isArray(data.favoriteQueries)) setFavoriteQueries(data.favoriteQueries);
+        })
+        .catch(() => {});
+    },
+    [setHistory, setFavoriteQueries],
+  );
+
+  const saveServerUserData = useCallback(
+    (token: string) => {
+      fetch("/api/user/data", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ history, favoriteQueries }),
+      }).catch(() => {});
+    },
+    [history, favoriteQueries],
+  );
+
+  // Load server data whenever the user logs in (token goes from null → value)
   useEffect(() => {
+    if (auth.token) {
+      serverDataLoadedRef.current = false; // reset so loadServerUserData proceeds
+      loadServerUserData(auth.token);
+    } else {
+      serverDataLoadedRef.current = false;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.token]);
+
+  // Auto-save to server whenever history or favorites change (debounced)
+  useEffect(() => {
+    if (!auth.token) return;
+    const id = setTimeout(() => saveServerUserData(auth.token!), 800);
+    return () => clearTimeout(id);
+  }, [auth.token, history, favoriteQueries, saveServerUserData]);
+
+  // On load: verify stored token is still valid; detect if auth is enabled; check AI status
+  useEffect(() => {
+    // Check AI availability
+    fetch("/api/ai/status")
+      .then((res) => res.json())
+      .then((data: { aiEnabled: boolean }) => setAIEnabled(data.aiEnabled))
+      .catch(() => {});
+
     // Check if auth is enabled on the server
     fetch("/api/auth/status")
       .then((res) => res.json())
@@ -121,7 +188,12 @@ export default function App() {
           fetch("/api/auth/me", {
             headers: { Authorization: `Bearer ${auth.token}` },
           }).then((res) => {
-            if (res.status === 401) logout();
+            if (res.status === 401) {
+              logout();
+            } else {
+              // Token is valid — load persisted user data from server
+              loadServerUserData(auth.token!);
+            }
           });
         } else {
           setAuth({ ...auth, authEnabled: true });
@@ -475,6 +547,41 @@ export default function App() {
           History
         </button>
 
+        {/* AI Help toggle — only shown when AI is enabled */}
+        {aiEnabled && (
+          <div className="relative group">
+            <button
+              onClick={() => {
+                if (!auth.token && auth.authEnabled) return;
+                setShowAIPanel((v) => !v);
+              }}
+              aria-label={showAIPanel ? "Hide AI assistant" : "Show AI assistant"}
+              aria-pressed={showAIPanel}
+              aria-disabled={!auth.token && auth.authEnabled}
+              className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm transition-colors ${
+                showAIPanel
+                  ? "bg-purple-600/20 border-purple-500 text-purple-300"
+                  : !auth.token && auth.authEnabled
+                    ? "bg-[var(--ide-surface2)] border-[var(--ide-border)] text-[var(--ide-text-4)] cursor-default"
+                    : "bg-[var(--ide-surface2)] border-[var(--ide-border)] hover:bg-[var(--ide-surface3)] text-purple-400 hover:text-purple-300"
+              }`}
+            >
+              <Sparkles size={13} aria-hidden="true" />
+              AI Help
+            </button>
+            {/* Tooltip shown when not logged in */}
+            {!auth.token && auth.authEnabled && (
+              <div
+                role="tooltip"
+                className="pointer-events-none absolute right-0 top-full mt-1.5 z-50 w-48 rounded-lg border border-[var(--ide-border)] bg-[var(--ide-surface)] px-3 py-2 text-xs text-[var(--ide-text-2)] shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                Sign in to use the AI assistant.
+                <div className="absolute -top-1 right-4 w-2 h-2 rotate-45 bg-[var(--ide-surface)] border-l border-t border-[var(--ide-border)]" />
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Theme toggle */}
         <button
           onClick={toggleTheme}
@@ -792,6 +899,26 @@ export default function App() {
                 />
               )}
             </div>
+          </div>
+        )}
+
+        {/* AI Help Panel */}
+        {showAIPanel && aiEnabled && (
+          <div
+            role="complementary"
+            aria-label="AI SQL assistant"
+            className="w-80 shrink-0 border-l border-[var(--ide-border)] overflow-hidden flex flex-col"
+          >
+            <AIHelpPanel
+              engine={engine}
+              tables={tables}
+              remoteConnection={remoteConnection}
+              token={auth.token}
+              onUseQuery={(sql) => {
+                setSql(sql);
+                setShowAIPanel(false);
+              }}
+            />
           </div>
         )}
       </div>

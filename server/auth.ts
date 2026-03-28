@@ -90,6 +90,13 @@ export function signToken(username: string): string {
   });
 }
 
+// Augment Express Request so downstream handlers can read req.username
+declare module "express-serve-static-core" {
+  interface Request {
+    username?: string;
+  }
+}
+
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!isAuthEnabled()) {
     next();
@@ -102,7 +109,8 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
   const token = header.slice(7);
   try {
-    jwt.verify(token, getJwtSecret()) as JwtPayload;
+    const payload = jwt.verify(token, getJwtSecret()) as JwtPayload;
+    req.username = payload.username;
     next();
   } catch {
     res.status(401).json({ error: "Invalid or expired token" });
