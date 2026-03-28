@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import path from "path";
@@ -18,12 +19,47 @@ import {
   getPostgresForeignKeys,
   testPostgresConnection,
 } from "./postgres.js";
+import {
+  requireAuth,
+  validateCredentials,
+  signToken,
+  isAuthEnabled,
+} from "./auth.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Auth: public status — lets the frontend know if login is required
+app.get("/api/auth/status", (_req, res) => {
+  res.json({ authEnabled: isAuthEnabled() });
+});
+
+// Auth: login endpoint (public)
+app.post("/api/auth/login", (req, res) => {
+  if (!isAuthEnabled()) {
+    res.json({ token: null, username: null, authEnabled: false });
+    return;
+  }
+  const { username, password } = req.body as { username?: string; password?: string };
+  if (!username || !password) {
+    res.status(400).json({ error: "username and password are required" });
+    return;
+  }
+  if (!validateCredentials(username, password)) {
+    res.status(401).json({ error: "Invalid credentials" });
+    return;
+  }
+  res.json({ token: signToken(username), username, authEnabled: true });
+});
+
+// Auth: verify endpoint — lets the frontend check if a stored token is still valid
+// requireAuth is applied here so an expired token returns 401
+app.get("/api/auth/me", requireAuth, (req, res) => {
+  res.json({ ok: true, authEnabled: isAuthEnabled() });
+});
 
 // Mount engine-specific routers
 app.use("/api", mysqlRouter);

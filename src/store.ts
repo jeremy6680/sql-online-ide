@@ -1,8 +1,13 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { DbEngine, HistoryEntry, QueryResult, RemoteConnection, TableInfo, ChartType, FavoriteQuery, SavedConnection } from './types'
+import type { DbEngine, HistoryEntry, QueryResult, RemoteConnection, TableInfo, ChartType, FavoriteQuery, SavedConnection, AuthState } from './types'
 
 interface AppState {
+  // Auth
+  auth: AuthState
+  setAuth: (auth: AuthState) => void
+  logout: () => void
+
   // Engine
   engine: DbEngine
   setEngine: (e: DbEngine) => void
@@ -60,6 +65,10 @@ interface AppState {
 export const useStore = create<AppState>()(
   persist(
     (set) => ({
+      auth: { token: null, username: null, authEnabled: true },
+      setAuth: (auth) => set({ auth }),
+      logout: () => set({ auth: { token: null, username: null, authEnabled: true } }),
+
       engine: 'sqlite',
       setEngine: (engine) => set({ engine }),
 
@@ -106,12 +115,22 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'sql-ide-storage',
+      // Only persist token + username — authEnabled is always fetched fresh from the server
       partialize: (state) => ({
+        auth: { token: state.auth.token, username: state.auth.username },
         history: state.history,
         sql: state.sql,
         favoriteQueries: state.favoriteQueries,
         savedConnections: state.savedConnections,
         theme: state.theme,
+      }),
+      merge: (persisted, current) => ({
+        ...current,
+        ...(persisted as Partial<AppState>),
+        auth: {
+          ...current.auth, // keeps authEnabled: true from default
+          ...((persisted as { auth?: Partial<AppState['auth']> }).auth ?? {}),
+        },
       }),
     }
   )

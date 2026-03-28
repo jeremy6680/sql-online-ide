@@ -14,6 +14,8 @@ import {
   Sun,
   Moon,
   Network,
+  LogIn,
+  LogOut,
 } from "lucide-react";
 import { Editor } from "./components/Editor";
 import { ResultsTable } from "./components/ResultsTable";
@@ -23,6 +25,7 @@ import { QueryHistory } from "./components/QueryHistory";
 import { FavoritesPanel } from "./components/FavoritesPanel";
 import { ConnectionModal } from "./components/ConnectionModal";
 import { SchemaView } from "./components/SchemaView";
+import { LoginModal } from "./components/LoginPage";
 
 import { useStore } from "./store";
 import {
@@ -54,6 +57,9 @@ const ENGINE_LABELS: Record<
 
 export default function App() {
   const {
+    auth,
+    setAuth,
+    logout,
     engine,
     setEngine,
     sql,
@@ -89,6 +95,7 @@ export default function App() {
     "table" | "chart" | "schema"
   >("table");
   const [showConnectionModal, setShowConnectionModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [rightPanelTab, setRightPanelTab] = useState<"history" | "favorites">(
     "history",
@@ -97,6 +104,34 @@ export default function App() {
   const [favName, setFavName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const runRef = useRef<() => void>(() => {});
+
+  // On load: verify stored token is still valid; detect if auth is enabled
+  useEffect(() => {
+    // Check if auth is enabled on the server
+    fetch("/api/auth/status")
+      .then((res) => res.json())
+      .then((data: { authEnabled: boolean }) => {
+        if (!data.authEnabled) {
+          // Auth disabled — clear any stale token
+          setAuth({ token: null, username: null, authEnabled: false });
+          return;
+        }
+        // Auth enabled — validate stored token if present
+        if (auth.token) {
+          fetch("/api/auth/me", {
+            headers: { Authorization: `Bearer ${auth.token}` },
+          }).then((res) => {
+            if (res.status === 401) logout();
+          });
+        } else {
+          setAuth({ ...auth, authEnabled: true });
+        }
+      })
+      .catch(() => {
+        // Server unreachable — keep current state
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Initialize default engine on first render
   useEffect(() => {
@@ -454,6 +489,30 @@ export default function App() {
             <Moon size={13} aria-hidden="true" />
           )}
         </button>
+
+        {/* Auth button — Sign in when not logged in, username+logout when logged in */}
+        {auth.token ? (
+          <button
+            onClick={logout}
+            aria-label={`Sign out (${auth.username})`}
+            title={`Signed in as ${auth.username}`}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/40 border border-[var(--ide-border)] rounded-lg text-sm transition-colors"
+          >
+            <span className="text-xs text-[var(--ide-text-2)]">
+              {auth.username}
+            </span>
+            <LogOut size={13} aria-hidden="true" />
+          </button>
+        ) : (
+          <button
+            onClick={() => setShowLoginModal(true)}
+            aria-label="Sign in"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors"
+          >
+            <LogIn size={13} aria-hidden="true" />
+            Sign in
+          </button>
+        )}
       </header>
 
       {/* ── Main Content ───────────────────────────────────────────── */}
@@ -783,6 +842,11 @@ export default function App() {
           onSaveConnection={(c: SavedConnection) => addSavedConnection(c)}
           onDeleteConnection={removeSavedConnection}
         />
+      )}
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <LoginModal onClose={() => setShowLoginModal(false)} />
       )}
     </div>
   );

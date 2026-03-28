@@ -66,3 +66,9 @@ export interface SavedConnection {
   engine: DbEngine;
   connection: RemoteConnection;
 }
+
+export interface AuthState {
+  token: string | null;
+  username: string | null;
+  authEnabled: boolean;
+}
