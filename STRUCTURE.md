@@ -12,7 +12,10 @@ sql-online-ide/
 │   │   ├── Sidebar.tsx         # Table explorer with column drill-down
 │   │   ├── QueryHistory.tsx    # Scrollable history of past queries
 │   │   ├── FavoritesPanel.tsx  # Saved/named queries panel
-│   │   └── ConnectionModal.tsx # Remote DB connection form + saved connections
+│   │   ├── ConnectionModal.tsx # Remote DB connection form + saved connections
+│   │   ├── LoginPage.tsx       # Login modal (JWT-based auth)
+│   │   ├── SchemaView.tsx      # ERD-style schema diagram (SVG)
+│   │   └── AIHelpPanel.tsx     # AI SQL assistant panel (natural language → SQL)
 │   ├── engines/                # Database engine wrappers
 │   │   ├── sqlite.ts           # sql.js (WASM) — init, query, tables, columns, file load
 │   │   ├── duckdb.ts           # duckdb-wasm — init, query, tables, columns
@@ -25,8 +28,13 @@ sql-online-ide/
 │
 ├── server/                     # Backend (Express proxy)
 │   ├── index.ts                # Express app — unified /api/* endpoints, static serving
+│   ├── auth.ts                 # JWT auth middleware, credential validation, token signing
+│   ├── userData.ts             # File-based per-user store (history + favorites → data/users/)
 │   ├── mysql.ts                # MySQL/MariaDB connector (mysql2) + router
 │   └── postgres.ts             # PostgreSQL connector (pg) + router
+│
+├── data/                       # Runtime-generated, gitignored
+│   └── users/                  # Per-user JSON files: <username>.json (history + favorites)
 │
 ├── public/
 │   └── sql-wasm.wasm           # Pre-built sql.js WASM binary (SQLite engine)
@@ -60,12 +68,13 @@ The root component and main orchestrator. Responsibilities:
 Zustand store, persisted to `localStorage`. Contains:
 - Active engine, current SQL, query result, loading state
 - Tables list, selected table
-- Query history (last 100 entries)
-- Favorite queries (named, engine-tagged)
+- Query history (last 100 entries) — also synced to server when logged in
+- Favorite queries (named, engine-tagged) — also synced to server when logged in
 - Remote connection (active session — **password included, not ideal for long-term storage**)
 - Saved connections (name + engine + RemoteConnection shape)
 - Panel visibility (sidebar, history panel)
 - Theme (`dark` | `light`)
+- Auth state (JWT token, username, authEnabled flag)
 
 ### `src/types.ts`
 All shared types. The canonical source of truth for:
@@ -84,12 +93,19 @@ Each file is a thin wrapper that exposes a consistent async API:
 
 ### `server/index.ts`
 Unified Express API surface:
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/query` | POST | Run SQL on MySQL/MariaDB/PostgreSQL |
-| `/api/tables` | POST | List tables for a connection |
-| `/api/columns` | POST | List columns for a table |
-| `/api/test-connection` | POST | Ping the DB without running a query |
+| Endpoint | Method | Auth required | Description |
+|---|---|---|---|
+| `/api/auth/status` | GET | No | Whether auth is enabled |
+| `/api/auth/login` | POST | No | Login — returns JWT |
+| `/api/auth/me` | GET | Yes | Validate stored token |
+| `/api/user/data` | GET | Yes | Load user's history + favorites from server |
+| `/api/user/data` | POST | Yes | Save user's history + favorites to server |
+| `/api/ai/sql` | POST | Yes | Translate natural-language prompt to SQL (requires `ANTHROPIC_API_KEY`) |
+| `/api/ai/status` | GET | No | Whether AI assistant is configured |
+| `/api/query` | POST | No | Run SQL on MySQL/MariaDB/PostgreSQL |
+| `/api/tables` | POST | No | List tables for a connection |
+| `/api/columns` | POST | No | List columns for a table |
+| `/api/test-connection` | POST | No | Ping the DB without running a query |
 
 In production, Express also serves the Vite-built frontend as static files.
 

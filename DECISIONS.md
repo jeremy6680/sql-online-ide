@@ -118,13 +118,47 @@ Most recent entries first.
 
 ---
 
-## [2025] No authentication layer
+## [2025] Optional JWT authentication layer
 
-**Decision:** The app ships with no authentication.
+**Decision:** The app supports an optional login system. Set `AUTH_USERS` in `.env` to enable it; leave it unset for unrestricted access.
 
 **Rationale:**
-- Target audience is personal / small-team use, self-hosted
-- Adding auth would significantly increase complexity and maintenance burden
-- The README explicitly warns against public exposure without auth
+- Target audience is personal / small-team use, self-hosted — auth should be opt-in, not mandatory
+- JWT (7-day expiry, signed with `JWT_SECRET`) keeps the implementation stateless
+- Passwords are hashed with bcrypt at server startup — never stored in plaintext
+- Enabling auth unlocks server-side features (history/favorites sync, AI assistant)
 
-**Future option:** HTTP Basic Auth via the reverse proxy (Coolify/Nginx), or a simple Express middleware, would be sufficient for most use cases.
+**Trade-off:**
+- Token is stored in `localStorage` — not HttpOnly. Acceptable for the current threat model (self-hosted, trusted users), but XSS would expose it
+- No token revocation — a stolen token is valid until expiry
+
+---
+
+## [2025] Server-side history and favorites sync for authenticated users
+
+**Decision:** When a user is logged in, query history and favorite queries are synced to the server (`data/users/<username>.json`). Anonymous users keep localStorage-only storage.
+
+**Rationale:**
+- Solves the core pain point: history and favorites vanish when clearing cache or opening a private window
+- File-based store is trivial to implement and maintain for a single-user or small-team deployment
+- Auto-save is debounced (800 ms) to avoid hammering the server on every keystroke
+
+**Trade-off:**
+- Plain JSON files on disk — not suitable for multi-instance deployments or high concurrency. A SQLite or Postgres store would be needed at scale
+- On login, server data fully replaces local state — if the user had unsaved local data in another browser, it is overwritten
+
+---
+
+## [2025] AI SQL assistant uses Claude via server-side API call
+
+**Decision:** The "AI Help" panel sends a natural-language prompt + current table schema to the Express backend (`/api/ai/sql`), which calls the Anthropic API (`claude-haiku-4-5-20251001`) and returns raw SQL.
+
+**Rationale:**
+- API key stays on the server — never exposed to the browser
+- Schema context (table names + column types) is fetched client-side and included in the request body, giving the model enough information to produce accurate JOIN/GROUP BY queries
+- `claude-haiku-4-5-20251001` is fast and cheap for this use case
+- Feature is entirely opt-in: the UI hides the button when `ANTHROPIC_API_KEY` is not set; the endpoint returns 503 gracefully
+
+**Trade-off:**
+- Requires auth to prevent anonymous users from burning the API key — the endpoint is gated behind `requireAuth`
+- No streaming — the full SQL is returned as one response. Acceptable for queries which are short

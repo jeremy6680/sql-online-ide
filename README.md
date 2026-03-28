@@ -12,13 +12,15 @@ Inspired by SQLiteOnline, but fully open source and without the limitations of t
 - 🖥️ **In-browser execution** — SQLite and DuckDB run entirely via WebAssembly (no server needed)
 - 🔎 **Table explorer** — browse tables and columns in the sidebar; click a table to preview its data
 - 🗑️ **Drop tables** — delete a table directly from the UI without writing SQL
-- 🕘 **Query history** — last 100 queries saved locally, click to restore
-- ⭐ **Favorites** — save and name queries for quick reuse
+- 🕘 **Query history** — last 100 queries; synced to the server when logged in (survives cache clears and private browsing)
+- ⭐ **Favorites** — save and name queries for quick reuse; synced to the server when logged in
 - 🔌 **Saved connections** — store MySQL/MariaDB/PostgreSQL connection configs locally
+- 🤖 **AI SQL assistant** — describe what you want in plain language, get a ready-to-run SQL query (requires an Anthropic API key and a user account)
 - 📊 **Charts** — visualize results as bar, line, pie, or bubble charts
 - 📥 **Import** — load `.db`, `.sqlite`, `.sqlite3`, or `.sql` files
 - 📤 **Export** — download query results as `.xlsx`
 - 🌓 **Light / dark theme** — Tokyo Night dark theme + clean light mode
+- 🔐 **Optional authentication** — enable login via `AUTH_USERS` env var; unlocks server-side sync and AI assistant
 
 ## Getting Started
 
@@ -81,9 +83,11 @@ sql-online-ide/
 - **Frontend** — React 18, TypeScript, Vite, TailwindCSS
 - **Editor** — CodeMirror 6
 - **Charts** — Chart.js + react-chartjs-2
-- **State** — Zustand (with localStorage persistence)
+- **State** — Zustand (with localStorage persistence + optional server sync)
 - **Export** — xlsx
 - **Backend** — Express, mysql2, pg
+- **Auth** — JWT (jsonwebtoken + bcryptjs)
+- **AI** — Anthropic SDK (claude-haiku-4-5-20251001)
 
 ## Deployment
 
@@ -129,10 +133,22 @@ Coolify handles SSL (Let's Encrypt) and zero-downtime redeploys on each push to 
 
 ### Environment variables
 
-| Variable   | Default       | Description                                                                 |
-| ---------- | ------------- | --------------------------------------------------------------------------- |
-| `NODE_ENV` | `development` | Set to `production` to serve the built frontend and enable security headers |
-| `PORT`     | `3001`        | Port the Express server listens on                                          |
+| Variable            | Default       | Description                                                                                    |
+| ------------------- | ------------- | ---------------------------------------------------------------------------------------------- |
+| `NODE_ENV`          | `development` | Set to `production` to serve the built frontend and enable security headers                    |
+| `PORT`              | `3001`        | Port the Express server listens on                                                             |
+| `AUTH_USERS`        | _(unset)_     | JSON array of `{username, password}` objects. If unset, the app is open to everyone            |
+| `JWT_SECRET`        | _(fallback)_  | Secret used to sign JWT tokens. **Set a strong random value in production**                    |
+| `ANTHROPIC_API_KEY` | _(unset)_     | Anthropic API key for the AI SQL assistant. If unset, the "AI Help" button is hidden           |
+
+**AUTH_USERS formats:**
+```
+# JSON array
+AUTH_USERS=[{"username":"alice","password":"passA"},{"username":"bob","password":"passB"}]
+
+# Simple pairs (comma-separated)
+AUTH_USERS=alice:passA,bob:passB
+```
 
 ### Technical requirements
 
