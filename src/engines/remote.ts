@@ -9,6 +9,21 @@ import type {
   RemoteConnection,
 } from "../types";
 
+// Reads the JWT token from the Zustand-persisted localStorage entry.
+// This avoids threading the token through every call site.
+function getAuthHeaders(): HeadersInit {
+  try {
+    const stored = localStorage.getItem("sql-ide-storage");
+    if (!stored) return {};
+    const { state } = JSON.parse(stored) as { state: { auth?: { token?: string | null } } };
+    const token = state?.auth?.token;
+    if (!token) return {};
+    return { Authorization: `Bearer ${token}` };
+  } catch {
+    return {};
+  }
+}
+
 interface RemoteQueryPayload {
   engine: DbEngine;
   sql: string;
@@ -22,7 +37,7 @@ export async function runRemoteQuery(
   try {
     const res = await fetch("/api/query", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify(payload),
     });
     const data = await res.json();
@@ -46,7 +61,7 @@ export async function getRemoteTables(
   try {
     const res = await fetch("/api/tables", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ engine, connection }),
     });
     const data = await res.json();
@@ -64,7 +79,7 @@ export async function getRemoteColumns(
   try {
     const res = await fetch("/api/columns", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ engine, connection, tableName }),
     });
     const data = await res.json();
@@ -85,7 +100,7 @@ export async function getRemoteForeignKeys(
   try {
     const res = await fetch("/api/foreign-keys", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ engine, connection }),
     });
     const data = await res.json();
