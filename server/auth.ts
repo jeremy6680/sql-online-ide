@@ -11,15 +11,38 @@ interface JwtPayload {
   username: string;
 }
 
-// Load and hash users from AUTH_USERS env var on startup
-// Format: '[{"username":"admin","password":"secret"}]'
+// Load and hash users from AUTH_USERS env var on startup.
+//
+// Two supported formats:
+//   JSON array:   [{"username":"admin","password":"secret"}]
+//   Simple pairs: admin:secret  or  admin:secret,bob:pass2
 let users: { username: string; hash: string }[] = [];
+
+function parseUsers(raw: string): AuthUser[] {
+  const trimmed = raw.trim();
+  // JSON format
+  if (trimmed.startsWith("[")) {
+    return JSON.parse(trimmed) as AuthUser[];
+  }
+  // Simple "username:password" pairs separated by commas
+  return trimmed.split(",").map((pair) => {
+    const colon = pair.indexOf(":");
+    if (colon === -1) throw new Error(`Invalid pair (no colon): "${pair}"`);
+    return {
+      username: pair.slice(0, colon).trim(),
+      password: pair.slice(colon + 1).trim(),
+    };
+  });
+}
 
 function loadUsers() {
   const raw = process.env.AUTH_USERS;
-  if (!raw) return;
+  if (!raw) {
+    console.log("AUTH_USERS not set — authentication disabled");
+    return;
+  }
   try {
-    const parsed: AuthUser[] = JSON.parse(raw);
+    const parsed = parseUsers(raw);
     users = parsed.map((u) => ({
       username: u.username,
       hash: bcrypt.hashSync(u.password, 10),
@@ -27,9 +50,12 @@ function loadUsers() {
     console.log(
       `Auth enabled — ${users.length} user(s): ${users.map((u) => u.username).join(", ")}`,
     );
-  } catch {
+  } catch (err) {
+    console.error(`AUTH_USERS parse error: ${String(err)}`);
     console.error(
-      "AUTH_USERS is not valid JSON. Expected: [{\"username\":\"...\",\"password\":\"...\"}]",
+      "Supported formats:\n" +
+      '  JSON:   [{\"username\":\"admin\",\"password\":\"secret\"}]\n' +
+      "  Simple: admin:secret  or  admin:secret,bob:pass2",
     );
   }
 }
