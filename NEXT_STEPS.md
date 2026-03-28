@@ -6,8 +6,8 @@ Prioritised backlog. Items at the top of each section are highest priority.
 
 ## 🔴 Accessibility (P0 — fix before anything else)
 
-- [ ] **Add `aria-label` to all icon-only buttons** — the toolbar has several buttons (`<Play>`, `<Upload>`, `<Download>`, theme toggle, sidebar toggle) that use only a Lucide icon with no visible text. Screen readers will read the SVG title or nothing. Every icon-only button needs an explicit `aria-label`.
-- [ ] **Engine selector keyboard navigation** — the engine pill buttons are focusable but have no `role="group"` + `aria-label` wrapper to communicate their purpose.
+- [x] **Add `aria-label` to all icon-only buttons** — every icon-only button in the toolbar has an explicit `aria-label` (App.tsx).
+- [x] **Engine selector keyboard navigation** — engine pill buttons are wrapped in `role="group"` + `aria-label="Database engine"` (App.tsx:409).
 - [ ] **ConnectionModal focus trap** — when the modal is open, keyboard focus must be trapped inside it. Currently, Tab can escape the modal.
 - [ ] **Drop table confirmation** — the inline confirm/cancel flow in `Sidebar.tsx` has no ARIA live region; screen readers won't know a confirmation appeared.
 - [ ] **ResultsTable column sort** — if sort is added, use `aria-sort` on `<th>` elements.
@@ -72,3 +72,7 @@ Prioritised backlog. Items at the top of each section are highest priority.
 - [x] COOP/COEP headers for DuckDB SharedArrayBuffer
 - [x] Test connection endpoint
 - [x] Paginated results table (100 rows per page)
+- [x] ERD schema diagram tab with FK relationship arrows (`SchemaView.tsx`)
+- [x] Optional multi-user JWT authentication (`LoginPage.tsx`, server-side middleware)
+- [x] Server-side sync for history, favorites, and saved connections
+- [x] AI SQL assistant — plain-language → SQL via Claude API (`AIHelpPanel.tsx`)
