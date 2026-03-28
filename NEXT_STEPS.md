@@ -8,10 +8,10 @@ Prioritised backlog. Items at the top of each section are highest priority.
 
 - [x] **Add `aria-label` to all icon-only buttons** — every icon-only button in the toolbar has an explicit `aria-label` (App.tsx).
 - [x] **Engine selector keyboard navigation** — engine pill buttons are wrapped in `role="group"` + `aria-label="Database engine"` (App.tsx:409).
-- [ ] **ConnectionModal focus trap** — when the modal is open, keyboard focus must be trapped inside it. Currently, Tab can escape the modal.
-- [ ] **Drop table confirmation** — the inline confirm/cancel flow in `Sidebar.tsx` has no ARIA live region; screen readers won't know a confirmation appeared.
+- [x] **ConnectionModal focus trap** — when the modal is open, keyboard focus must be trapped inside it. Currently, Tab can escape the modal.
+- [x] **Drop table confirmation** — the inline confirm/cancel flow in `Sidebar.tsx` has no ARIA live region; screen readers won't know a confirmation appeared.
 - [ ] **ResultsTable column sort** — if sort is added, use `aria-sort` on `<th>` elements.
-- [ ] **Error messages** — query errors in `ResultsTable` should use `role="alert"` so screen readers announce them automatically.
+- [x] **Error messages** — query errors in `ResultsTable` should use `role="alert"` so screen readers announce them automatically.
 
 ---
 
