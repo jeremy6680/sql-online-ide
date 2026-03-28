@@ -72,17 +72,19 @@ app.get("/api/user/data", requireAuth, (req, res) => {
   res.json(loadUserData(username));
 });
 
-// POST /api/user/data — replaces this user's history + favorites
+// POST /api/user/data — replaces this user's history, favorites, and saved connections
 app.post("/api/user/data", requireAuth, (req, res) => {
   const username = req.username ?? "__anonymous__";
-  const { history, favoriteQueries } = req.body as {
+  const { history, favoriteQueries, savedConnections } = req.body as {
     history?: unknown[];
     favoriteQueries?: unknown[];
+    savedConnections?: unknown[];
   };
   const current = loadUserData(username);
   saveUserData(username, {
     history: history ?? current.history,
     favoriteQueries: favoriteQueries ?? current.favoriteQueries,
+    savedConnections: savedConnections ?? current.savedConnections,
   });
   res.json({ ok: true });
 });

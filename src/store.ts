@@ -50,6 +50,7 @@ interface AppState {
 
   // Saved connections
   savedConnections: SavedConnection[]
+  setSavedConnections: (c: SavedConnection[]) => void
   addSavedConnection: (c: SavedConnection) => void
   removeSavedConnection: (id: string) => void
 
@@ -106,6 +107,7 @@ export const useStore = create<AppState>()(
       removeFavoriteQuery: (id) => set((state) => ({ favoriteQueries: state.favoriteQueries.filter(q => q.id !== id) })),
 
       savedConnections: [],
+      setSavedConnections: (savedConnections) => set({ savedConnections }),
       addSavedConnection: (c) => set((state) => ({ savedConnections: [c, ...state.savedConnections] })),
       removeSavedConnection: (id) => set((state) => ({ savedConnections: state.savedConnections.filter(c => c.id !== id) })),
 
