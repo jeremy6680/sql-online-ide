@@ -91,6 +91,7 @@ export default function App() {
     addFavoriteQuery,
     removeFavoriteQuery,
     savedConnections,
+    setSavedConnections,
     addSavedConnection,
     removeSavedConnection,
     theme,
@@ -125,13 +126,14 @@ export default function App() {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => res.json())
-        .then((data: { history?: HistoryEntry[]; favoriteQueries?: FavoriteQuery[] }) => {
+        .then((data: { history?: HistoryEntry[]; favoriteQueries?: FavoriteQuery[]; savedConnections?: SavedConnection[] }) => {
           if (Array.isArray(data.history)) setHistory(data.history);
           if (Array.isArray(data.favoriteQueries)) setFavoriteQueries(data.favoriteQueries);
+          if (Array.isArray(data.savedConnections)) setSavedConnections(data.savedConnections);
         })
         .catch(() => {});
     },
-    [setHistory, setFavoriteQueries],
+    [setHistory, setFavoriteQueries, setSavedConnections],
   );
 
   const saveServerUserData = useCallback(
@@ -142,10 +144,10 @@ export default function App() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ history, favoriteQueries }),
+        body: JSON.stringify({ history, favoriteQueries, savedConnections }),
       }).catch(() => {});
     },
-    [history, favoriteQueries],
+    [history, favoriteQueries, savedConnections],
   );
 
   // Load server data whenever the user logs in (token goes from null → value)
@@ -164,7 +166,7 @@ export default function App() {
     if (!auth.token) return;
     const id = setTimeout(() => saveServerUserData(auth.token!), 800);
     return () => clearTimeout(id);
-  }, [auth.token, history, favoriteQueries, saveServerUserData]);
+  }, [auth.token, history, favoriteQueries, savedConnections, saveServerUserData]);
 
   // On load: verify stored token is still valid; detect if auth is enabled; check AI status
   useEffect(() => {

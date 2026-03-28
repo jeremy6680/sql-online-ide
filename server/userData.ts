@@ -23,6 +23,7 @@ function filePath(username: string) {
 export interface UserData {
   history: unknown[];
   favoriteQueries: unknown[];
+  savedConnections: unknown[];
 }
 
 export function loadUserData(username: string): UserData {
@@ -31,7 +32,7 @@ export function loadUserData(username: string): UserData {
     const raw = fs.readFileSync(filePath(username), "utf8");
     return JSON.parse(raw) as UserData;
   } catch {
-    return { history: [], favoriteQueries: [] };
+    return { history: [], favoriteQueries: [], savedConnections: [] };
   }
 }
 
