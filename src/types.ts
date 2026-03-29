@@ -74,3 +74,10 @@ export interface AuthState {
   username: string | null;
   authEnabled: boolean;
 }
+
+export interface QueryTab {
+  id: string;
+  name: string;
+  sql: string;
+  engine: DbEngine;
+}

@@ -160,3 +160,26 @@ export async function getDuckDBForeignKeys(): Promise<ForeignKeyInfo[]> {
     return [];
   }
 }
+
+/**
+ * Registers a local file (CSV, JSON, Parquet) into DuckDB's virtual filesystem
+ * and returns the SQL snippet the user can run to import it as a table.
+ * The file is registered under its original name so DuckDB read_* functions can reference it.
+ */
+export async function registerDuckDBFile(file: File): Promise<string> {
+  if (!db) await initDuckDB();
+  const fileName = file.name;
+  const buffer = await file.arrayBuffer();
+  await db!.registerFileBuffer(fileName, new Uint8Array(buffer));
+
+  const ext = fileName.split('.').pop()?.toLowerCase() ?? ''
+  const tableName = fileName.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_]/g, '_')
+  if (ext === 'parquet') {
+    return `CREATE TABLE ${tableName} AS SELECT * FROM read_parquet('${fileName}');`
+  } else if (ext === 'json' || ext === 'ndjson') {
+    return `CREATE TABLE ${tableName} AS SELECT * FROM read_json_auto('${fileName}');`
+  } else {
+    // csv, tsv, txt — use auto-detect
+    return `CREATE TABLE ${tableName} AS SELECT * FROM read_csv_auto('${fileName}');`
+  }
+}

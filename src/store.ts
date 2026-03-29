@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { DbEngine, HistoryEntry, QueryResult, RemoteConnection, TableInfo, ChartType, FavoriteQuery, SavedConnection, AuthState } from './types'
+import type { DbEngine, HistoryEntry, QueryResult, RemoteConnection, TableInfo, ChartType, FavoriteQuery, SavedConnection, AuthState, QueryTab } from './types'
 
 interface AppState {
   // Auth
@@ -63,6 +63,16 @@ interface AppState {
   // Theme
   theme: 'dark' | 'light'
   toggleTheme: () => void
+
+  // Query tabs
+  tabs: QueryTab[]
+  activeTabId: string
+  addTab: () => void
+  closeTab: (id: string) => void
+  setActiveTab: (id: string) => void
+  updateTabSql: (id: string, sql: string) => void
+  updateTabName: (id: string, name: string) => void
+  updateTabEngine: (id: string, engine: DbEngine) => void
 }
 
 export const useStore = create<AppState>()(
@@ -118,6 +128,36 @@ export const useStore = create<AppState>()(
 
       theme: 'dark',
       toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
+
+      tabs: [{ id: 'tab-1', name: 'Query 1', sql: '', engine: 'sqlite' }],
+      activeTabId: 'tab-1',
+      addTab: () => set((state) => {
+        const id = crypto.randomUUID()
+        const n = state.tabs.length + 1
+        return {
+          tabs: [...state.tabs, { id, name: `Query ${n}`, sql: '', engine: state.engine }],
+          activeTabId: id,
+        }
+      }),
+      closeTab: (id) => set((state) => {
+        if (state.tabs.length === 1) return {} // always keep at least one tab
+        const idx = state.tabs.findIndex(t => t.id === id)
+        const next = state.tabs[idx === 0 ? 1 : idx - 1]
+        return {
+          tabs: state.tabs.filter(t => t.id !== id),
+          activeTabId: state.activeTabId === id ? next.id : state.activeTabId,
+        }
+      }),
+      setActiveTab: (id) => set({ activeTabId: id }),
+      updateTabSql: (id, sql) => set((state) => ({
+        tabs: state.tabs.map(t => t.id === id ? { ...t, sql } : t)
+      })),
+      updateTabName: (id, name) => set((state) => ({
+        tabs: state.tabs.map(t => t.id === id ? { ...t, name } : t)
+      })),
+      updateTabEngine: (id, engine) => set((state) => ({
+        tabs: state.tabs.map(t => t.id === id ? { ...t, engine } : t)
+      })),
     }),
     {
       name: 'sql-ide-storage',
@@ -129,6 +169,8 @@ export const useStore = create<AppState>()(
         favoriteQueries: state.favoriteQueries,
         savedConnections: state.savedConnections,
         theme: state.theme,
+        tabs: state.tabs,
+        activeTabId: state.activeTabId,
       }),
       merge: (persisted, current) => ({
         ...current,
