@@ -12,9 +12,11 @@ interface EditorProps {
   onChange: (val: string) => void
   onRun: () => void
   isDark: boolean
+  schema?: Record<string, string[]>
 }
 
 const themeCompartment = new Compartment()
+const schemaCompartment = new Compartment()
 
 function buildThemeExtension(isDark: boolean) {
   const base = EditorView.theme({
@@ -31,7 +33,7 @@ function buildThemeExtension(isDark: boolean) {
   return isDark ? [base, oneDark] : [base]
 }
 
-export function Editor({ value, onChange, onRun, isDark }: EditorProps) {
+export function Editor({ value, onChange, onRun, isDark, schema }: EditorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const onRunRef = useRef(onRun)
@@ -58,7 +60,7 @@ export function Editor({ value, onChange, onRun, isDark }: EditorProps) {
         bracketMatching(),
         foldGutter(),
         autocompletion(),
-        sql(),
+        schemaCompartment.of(sql({ schema: schema ?? {} })),
         themeCompartment.of(buildThemeExtension(isDark)),
         keymap.of([runCmd, ...defaultKeymap, ...historyKeymap, ...completionKeymap, ...foldKeymap]),
         EditorView.updateListener.of((update) => {
@@ -89,6 +91,13 @@ export function Editor({ value, onChange, onRun, isDark }: EditorProps) {
       effects: themeCompartment.reconfigure(buildThemeExtension(isDark))
     })
   }, [isDark])
+
+  // Reconfigure SQL schema for autocompletion when tables/columns change
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: schemaCompartment.reconfigure(sql({ schema: schema ?? {} }))
+    })
+  }, [schema])
 
   return <div ref={containerRef} className="h-full w-full overflow-hidden" />
 }

@@ -6,8 +6,8 @@
 sql-online-ide/
 ├── src/                        # Frontend (React + TypeScript)
 │   ├── components/             # UI components
-│   │   ├── Editor.tsx          # CodeMirror 6 SQL editor wrapper
-│   │   ├── ResultsTable.tsx    # Paginated query results table
+│   │   ├── Editor.tsx          # CodeMirror 6 SQL editor wrapper (schema-aware autocomplete)
+│   │   ├── ResultsTable.tsx    # Paginated results table (copy cell/row, type badges)
 │   │   ├── ChartView.tsx       # Chart.js visualisation panel
 │   │   ├── Sidebar.tsx         # Table explorer with column drill-down
 │   │   ├── QueryHistory.tsx    # Scrollable history of past queries
@@ -15,6 +15,7 @@ sql-online-ide/
 │   │   ├── ConnectionModal.tsx # Remote DB connection form + saved connections
 │   │   ├── LoginPage.tsx       # Login modal (JWT-based auth)
 │   │   ├── SchemaView.tsx      # ERD-style schema diagram (SVG)
+│   │   ├── ShortcutsModal.tsx  # Keyboard shortcuts reference modal (open with `?`)
 │   │   └── AIHelpPanel.tsx     # AI SQL assistant panel (natural language → SQL)
 │   ├── engines/                # Database engine wrappers
 │   │   ├── sqlite.ts           # sql.js (WASM) — init, query, tables, columns, file load
@@ -61,8 +62,10 @@ The root component and main orchestrator. Responsibilities:
 - Engine initialisation and switching (`handleEngineChange`)
 - Query execution routing (`handleRun`) — dispatches to the right engine wrapper
 - Table browsing and dropping
-- Import (`.db`, `.sqlite`, `.sqlite3`, `.sql`) and export (`.xlsx`)
+- Import (`.db`, `.sqlite`, `.sqlite3`, `.sql`) and export (`.xlsx`, `.csv`)
 - Right panel (history/favorites) and sidebar toggle state
+- Schema map computation for CodeMirror autocompletion (`schemaMap` state, wired into `<Editor>`)
+- Resizable editor/results split via drag handle (`editorHeightPct` state)
 
 ### `src/store.ts`
 Zustand store, persisted to `localStorage`. Contains:
@@ -79,7 +82,7 @@ Zustand store, persisted to `localStorage`. Contains:
 ### `src/types.ts`
 All shared types. The canonical source of truth for:
 - `DbEngine` — union type for the five supported engines
-- `QueryResult` — columns, rows, rowCount, executionTime, error
+- `QueryResult` — columns, rows, rowCount, executionTime, error, statementIndex?, statementTotal?
 - `TableInfo`, `ColumnInfo` — schema metadata
 - `HistoryEntry`, `FavoriteQuery`, `SavedConnection`, `RemoteConnection`
 - `ChartType`
