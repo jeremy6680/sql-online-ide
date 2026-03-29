@@ -8,6 +8,8 @@ export interface QueryResult {
   rowCount: number;
   executionTime: number;
   error?: string;
+  statementIndex?: number;
+  statementTotal?: number;
 }
 
 export interface TableInfo {

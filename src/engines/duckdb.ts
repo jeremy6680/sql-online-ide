@@ -53,11 +53,13 @@ export async function runDuckDBQuery(sql: string): Promise<QueryResult> {
       rows.push(rowData);
     }
 
+    const statementTotal = sql.split(';').map(s => s.trim()).filter(Boolean).length
     return {
       columns,
       rows,
       rowCount: rows.length,
       executionTime: performance.now() - start,
+      ...(statementTotal > 1 ? { statementIndex: statementTotal, statementTotal } : {}),
     };
   } catch (err) {
     return {

@@ -55,10 +55,13 @@ export async function runSQLiteQuery(sql: string): Promise<QueryResult> {
       rowCount: 0,
       executionTime: 0,
     };
+    let lastIndex = 0;
 
-    for (const stmt of statements) {
+    for (let idx = 0; idx < statements.length; idx++) {
+      const stmt = statements[idx];
       if (!stmt) continue;
       const results = db!.exec(stmt);
+      lastIndex = idx;
       if (results.length > 0) {
         const r = results[0];
         lastResult = {
@@ -79,6 +82,10 @@ export async function runSQLiteQuery(sql: string): Promise<QueryResult> {
     }
 
     lastResult.executionTime = performance.now() - start;
+    if (statements.length > 1) {
+      lastResult.statementIndex = lastIndex + 1;
+      lastResult.statementTotal = statements.length;
+    }
     return lastResult;
   } catch (err) {
     return {

@@ -67,9 +67,9 @@ Most recent entries first.
 
 **Trade-off:**
 - More verbose setup than Monaco for features like multi-cursor or advanced autocomplete
-- SQL autocomplete is schema-unaware by default (does not yet use the live table/column list from the sidebar)
+- Schema compartment must be reconfigured (not recreated) when tables change — use `Compartment.reconfigure()` to avoid destroying editor state
 
-**Known improvement:** Wire the tables/columns from the Zustand store into CodeMirror's `sql()` schema config for context-aware autocompletion.
+**Update (2026):** Schema-aware autocompletion is now wired: table and column names are loaded on every `tables` state change and pushed into a dedicated `schemaCompartment`, giving context-aware suggestions.
 
 ---
 

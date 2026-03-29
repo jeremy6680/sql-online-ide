@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import type { QueryResult } from '../types'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Copy } from 'lucide-react'
 
 const PAGE_SIZE = 100
 
@@ -10,6 +10,14 @@ interface ResultsTableProps {
 
 export function ResultsTable({ result }: ResultsTableProps) {
   const [page, setPage] = useState(0)
+  const [copied, setCopied] = useState<string | null>(null)
+
+  const copy = useCallback((key: string, text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key)
+      setTimeout(() => setCopied(null), 1200)
+    })
+  }, [])
 
   const pageCount = Math.ceil(result.rows.length / PAGE_SIZE)
   const pageRows = useMemo(
@@ -41,6 +49,11 @@ export function ResultsTable({ result }: ResultsTableProps) {
       <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--ide-surface2)] border-b border-[var(--ide-border)] text-xs text-[var(--ide-text-2)]">
         <span>
           {result.rowCount} row{result.rowCount !== 1 ? 's' : ''} · {result.columns.length} col{result.columns.length !== 1 ? 's' : ''} · {result.executionTime.toFixed(2)}ms
+          {result.statementTotal && result.statementTotal > 1 && (
+            <span className="ml-2 text-[var(--ide-text-3)]">
+              · statement {result.statementIndex}/{result.statementTotal}
+            </span>
+          )}
         </span>
         {pageCount > 1 && (
           <div className="flex items-center gap-2">
@@ -75,24 +88,50 @@ export function ResultsTable({ result }: ResultsTableProps) {
             </tr>
           </thead>
           <tbody>
-            {pageRows.map((row, i) => (
-              <tr key={i} className="hover:bg-[var(--ide-surface2)] border-b border-[var(--ide-border)]/50">
-                <td className="px-2 py-1 text-right text-[var(--ide-text-4)] border-r border-[var(--ide-border)]/50 text-xs">
-                  {page * PAGE_SIZE + i + 1}
-                </td>
-                {row.map((cell, j) => (
-                  <td key={j} className="px-3 py-1 border-r border-[var(--ide-border)]/50 whitespace-nowrap font-mono text-xs">
-                    {cell === null ? (
-                      <span className="text-[var(--ide-text-4)] italic">NULL</span>
-                    ) : typeof cell === 'boolean' ? (
-                      <span className={cell ? 'text-green-400' : 'text-red-400'}>{String(cell)}</span>
-                    ) : (
-                      <span className="text-[var(--ide-text)]">{String(cell)}</span>
-                    )}
+            {pageRows.map((row, i) => {
+              const rowKey = `row-${i}`
+              return (
+                <tr key={i} className="hover:bg-[var(--ide-surface2)] border-b border-[var(--ide-border)]/50 group">
+                  <td className="px-2 py-1 text-right text-[var(--ide-text-4)] border-r border-[var(--ide-border)]/50 text-xs">
+                    <button
+                      onClick={() => copy(rowKey, row.map(c => c === null ? '' : String(c)).join('\t'))}
+                      title="Copy row"
+                      className="opacity-0 group-hover:opacity-100 mr-1 hover:text-blue-400 transition-opacity"
+                      aria-label="Copy row"
+                    >
+                      {copied === rowKey
+                        ? <span className="text-green-400 text-[10px]">✓</span>
+                        : <Copy size={10} />}
+                    </button>
+                    {page * PAGE_SIZE + i + 1}
                   </td>
-                ))}
-              </tr>
-            ))}
+                  {row.map((cell, j) => {
+                    const cellKey = `${i}-${j}`
+                    return (
+                      <td
+                        key={j}
+                        className="px-3 py-1 border-r border-[var(--ide-border)]/50 whitespace-nowrap font-mono text-xs cursor-pointer relative"
+                        onClick={() => copy(cellKey, cell === null ? '' : String(cell))}
+                        title="Click to copy"
+                      >
+                        {cell === null ? (
+                          <span className="text-[var(--ide-text-4)] italic">NULL</span>
+                        ) : typeof cell === 'boolean' ? (
+                          <span className={cell ? 'text-green-400' : 'text-red-400'}>{String(cell)}</span>
+                        ) : typeof cell === 'number' ? (
+                          <span className="text-blue-300 tabular-nums">{String(cell)}</span>
+                        ) : (
+                          <span className="text-[var(--ide-text)]">{String(cell)}</span>
+                        )}
+                        {copied === cellKey && (
+                          <span className="absolute right-1 top-1/2 -translate-y-1/2 text-green-400 text-[10px]">✓</span>
+                        )}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

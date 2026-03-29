@@ -17,13 +17,13 @@ Prioritised backlog. Items at the top of each section are highest priority.
 
 ## 🟠 UX Improvements (P1 — high value, low risk)
 
-- [ ] **Schema-aware SQL autocompletion** — wire the live tables/columns list from the Zustand store into CodeMirror's `sql({ schema })` option. Currently, autocompletion is keyword-only.
-- [ ] **Resizable panels** — the editor/results split and the sidebar width are fixed. A drag handle would let users adjust the layout.
-- [ ] **Keyboard shortcut reference** — add a `?` button or `Ctrl+/` shortcut that shows a modal listing all keyboard shortcuts (`Ctrl+Enter` to run, etc.).
-- [ ] **Multi-statement execution feedback** — when running multiple statements, show which statement produced the displayed result (e.g. "Showing result of statement 3/3").
-- [ ] **Export CSV** — add CSV export alongside the existing XLSX export. CSV is more universal for data pipelines.
-- [ ] **Copy cell / copy row** — right-click context menu or button on the results table to copy a cell or row value.
-- [ ] **NULL / type badges in results** — visually distinguish NULL, boolean, number, and string values in the results table (already partial — NULLs are italic, booleans are coloured).
+- [x] **Schema-aware SQL autocompletion** — wire the live tables/columns list from the Zustand store into CodeMirror's `sql({ schema })` option. Currently, autocompletion is keyword-only.
+- [x] **Resizable panels** — the editor/results split and the sidebar width are fixed. A drag handle would let users adjust the layout.
+- [x] **Keyboard shortcut reference** — add a `?` button or `Ctrl+/` shortcut that shows a modal listing all keyboard shortcuts (`Ctrl+Enter` to run, etc.).
+- [x] **Multi-statement execution feedback** — when running multiple statements, show which statement produced the displayed result (e.g. "Showing result of statement 3/3").
+- [x] **Export CSV** — add CSV export alongside the existing XLSX export. CSV is more universal for data pipelines.
+- [x] **Copy cell / copy row** — right-click context menu or button on the results table to copy a cell or row value.
+- [x] **NULL / type badges in results** — visually distinguish NULL, boolean, number, and string values in the results table (already partial — NULLs are italic, booleans are coloured).
 
 ---
 

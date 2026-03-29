@@ -17,6 +17,7 @@ import {
   LogIn,
   LogOut,
   Sparkles,
+  Keyboard,
 } from "lucide-react";
 import { Editor } from "./components/Editor";
 import { ResultsTable } from "./components/ResultsTable";
@@ -28,16 +29,18 @@ import { ConnectionModal } from "./components/ConnectionModal";
 import { SchemaView } from "./components/SchemaView";
 import { LoginModal } from "./components/LoginPage";
 import { AIHelpPanel } from "./components/AIHelpPanel";
+import { ShortcutsModal } from "./components/ShortcutsModal";
 
 import { useStore } from "./store";
 import {
   initSQLite,
   runSQLiteQuery,
   getSQLiteTables,
+  getSQLiteColumns,
   loadSQLiteFile,
 } from "./engines/sqlite";
-import { initDuckDB, runDuckDBQuery, getDuckDBTables } from "./engines/duckdb";
-import { runRemoteQuery, getRemoteTables } from "./engines/remote";
+import { initDuckDB, runDuckDBQuery, getDuckDBTables, getDuckDBColumns } from "./engines/duckdb";
+import { runRemoteQuery, getRemoteTables, getRemoteColumns } from "./engines/remote";
 import type {
   DbEngine,
   ChartType,
@@ -111,6 +114,10 @@ export default function App() {
   const [favName, setFavName] = useState("");
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [aiEnabled, setAIEnabled] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [schemaMap, setSchemaMap] = useState<Record<string, string[]>>({});
+  const [editorHeightPct, setEditorHeightPct] = useState(50);
+  const centerPanelRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const runRef = useRef<() => void>(() => {});
   // Track whether we have already loaded server data for the current session
@@ -206,6 +213,37 @@ export default function App() {
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Build schema map for CodeMirror autocompletion whenever the table list changes
+  useEffect(() => {
+    if (!tables.length) { setSchemaMap({}); return }
+    const load = async () => {
+      const entries = await Promise.all(
+        tables.map(async (t) => {
+          let cols: string[] = []
+          try {
+            if (engine === 'sqlite') cols = getSQLiteColumns(t.name).map(c => c.name)
+            else if (engine === 'duckdb') cols = (await getDuckDBColumns(t.name)).map(c => c.name)
+            else if (remoteConnection) cols = (await getRemoteColumns(engine, remoteConnection, t.name)).map(c => c.name)
+          } catch { /* best-effort */ }
+          return [t.name, cols] as [string, string[]]
+        })
+      )
+      setSchemaMap(Object.fromEntries(entries))
+    }
+    load()
+  }, [tables, engine, remoteConnection])
+
+  // Open shortcuts modal on `?` (ignore when focus is in an input/textarea)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (e.key === '?') setShowShortcuts(true)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // Initialize default engine on first render
   useEffect(() => {
@@ -312,6 +350,25 @@ export default function App() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Results");
     XLSX.writeFile(wb, `query_results_${Date.now()}.xlsx`);
+  };
+
+  const handleExportCSV = () => {
+    if (!result || result.error || !result.columns.length) return;
+    const escape = (v: unknown) => {
+      const s = v === null ? '' : String(v);
+      return s.includes(',') || s.includes('"') || s.includes('\n')
+        ? `"${s.replace(/"/g, '""')}"`
+        : s;
+    };
+    const csv = [result.columns, ...result.rows]
+      .map((row) => (row as unknown[]).map(escape).join(','))
+      .join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `query_results_${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   // MySQL/MariaDB use backticks for identifiers; all others use double quotes
@@ -470,7 +527,7 @@ export default function App() {
           onChange={handleImport}
         />
 
-        {/* Export button */}
+        {/* Export buttons */}
         <button
           onClick={handleExportXLSX}
           disabled={!result || !!result.error || !result.columns.length}
@@ -479,7 +536,17 @@ export default function App() {
           className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors disabled:opacity-40"
         >
           <Download size={13} aria-hidden="true" />
-          Export XLSX
+          XLSX
+        </button>
+        <button
+          onClick={handleExportCSV}
+          disabled={!result || !!result.error || !result.columns.length}
+          aria-label="Export query results as CSV"
+          aria-disabled={!result || !!result.error || !result.columns.length}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors disabled:opacity-40"
+        >
+          <Download size={13} aria-hidden="true" />
+          CSV
         </button>
 
         {/* Save as favorite — inline name-input flow */}
@@ -584,6 +651,15 @@ export default function App() {
           </div>
         )}
 
+        {/* Keyboard shortcuts reference */}
+        <button
+          onClick={() => setShowShortcuts(true)}
+          aria-label="Show keyboard shortcuts"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors"
+        >
+          <Keyboard size={13} aria-hidden="true" />
+        </button>
+
         {/* Theme toggle */}
         <button
           onClick={toggleTheme}
@@ -668,26 +744,45 @@ export default function App() {
         )}
 
         {/* Center panel — editor + results */}
-        <div className="flex flex-col flex-1 overflow-hidden">
+        <div ref={centerPanelRef} className="flex flex-col flex-1 overflow-hidden">
           {/* Editor region */}
           <div
             role="region"
             aria-label="SQL editor"
             className="overflow-hidden min-h-0"
-            style={{ flex: "1 1 50%" }}
+            style={{ height: `${editorHeightPct}%` }}
           >
             <Editor
               value={sql}
               onChange={setSql}
               onRun={() => runRef.current()}
               isDark={theme === "dark"}
+              schema={schemaMap}
             />
           </div>
 
-          {/* Divider */}
+          {/* Drag handle */}
           <div
-            className="h-px bg-[var(--ide-border)] shrink-0"
             role="separator"
+            aria-label="Resize editor and results"
+            aria-orientation="horizontal"
+            className="h-1.5 bg-[var(--ide-border)] shrink-0 cursor-row-resize hover:bg-blue-500/40 transition-colors active:bg-blue-500/60"
+            onMouseDown={(e) => {
+              e.preventDefault()
+              const panel = centerPanelRef.current
+              if (!panel) return
+              const onMove = (ev: MouseEvent) => {
+                const { top, height } = panel.getBoundingClientRect()
+                const pct = Math.min(80, Math.max(20, ((ev.clientY - top) / height) * 100))
+                setEditorHeightPct(pct)
+              }
+              const onUp = () => {
+                document.removeEventListener('mousemove', onMove)
+                document.removeEventListener('mouseup', onUp)
+              }
+              document.addEventListener('mousemove', onMove)
+              document.addEventListener('mouseup', onUp)
+            }}
           />
 
           {/* Results panel */}
@@ -695,7 +790,7 @@ export default function App() {
             role="region"
             aria-label="Query results"
             className="flex flex-col overflow-hidden"
-            style={{ flex: "1 1 50%" }}
+            style={{ height: `${100 - editorHeightPct}%` }}
           >
             {/* Results view tabs */}
             <div
@@ -976,6 +1071,11 @@ export default function App() {
       {/* Login Modal */}
       {showLoginModal && (
         <LoginModal onClose={() => setShowLoginModal(false)} />
+      )}
+
+      {/* Shortcuts Modal */}
+      {showShortcuts && (
+        <ShortcutsModal onClose={() => setShowShortcuts(false)} />
       )}
     </div>
   );
