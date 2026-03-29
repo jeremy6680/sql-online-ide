@@ -18,8 +18,14 @@ import {
   LogOut,
   Sparkles,
   Keyboard,
+  Link,
+  Check,
+  WandSparkles,
+  X,
+  Plus,
+  ChevronDown,
 } from "lucide-react";
-import { Editor } from "./components/Editor";
+import { Editor, type EditorHandle } from "./components/Editor";
 import { ResultsTable } from "./components/ResultsTable";
 import { ChartView } from "./components/ChartView";
 import { Sidebar } from "./components/Sidebar";
@@ -39,7 +45,7 @@ import {
   getSQLiteColumns,
   loadSQLiteFile,
 } from "./engines/sqlite";
-import { initDuckDB, runDuckDBQuery, getDuckDBTables, getDuckDBColumns } from "./engines/duckdb";
+import { initDuckDB, runDuckDBQuery, getDuckDBTables, getDuckDBColumns, registerDuckDBFile } from "./engines/duckdb";
 import { runRemoteQuery, getRemoteTables, getRemoteColumns } from "./engines/remote";
 import type {
   DbEngine,
@@ -99,7 +105,16 @@ export default function App() {
     removeSavedConnection,
     theme,
     toggleTheme,
+    tabs,
+    activeTabId,
+    addTab,
+    closeTab,
+    setActiveTab,
+    updateTabSql,
+    updateTabEngine,
   } = useStore();
+
+  const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[0];
 
   const [activeResultTab, setActiveResultTab] = useState<
     "table" | "chart" | "schema"
@@ -116,9 +131,14 @@ export default function App() {
   const [aiEnabled, setAIEnabled] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [schemaMap, setSchemaMap] = useState<Record<string, string[]>>({});
+  const [shareCopied, setShareCopied] = useState(false);
+  const [showImportMenu, setShowImportMenu] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [editorHeightPct, setEditorHeightPct] = useState(50);
   const centerPanelRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const duckdbImportRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<EditorHandle>(null);
   const runRef = useRef<() => void>(() => {});
   // Track whether we have already loaded server data for the current session
   const serverDataLoadedRef = useRef(false);
@@ -214,6 +234,15 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Sync store sql/engine → active tab when tab switches
+  useEffect(() => {
+    if (!activeTab) return
+    setSql(activeTab.sql)
+    // Only switch engine if it differs (avoids re-init on every render)
+    if (activeTab.engine !== engine) handleEngineChange(activeTab.engine)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTabId])
+
   // Build schema map for CodeMirror autocompletion whenever the table list changes
   useEffect(() => {
     if (!tables.length) { setSchemaMap({}); return }
@@ -233,6 +262,31 @@ export default function App() {
     }
     load()
   }, [tables, engine, remoteConnection])
+
+  // Read URL hash on first render and restore SQL + engine from it
+  useEffect(() => {
+    const hash = window.location.hash.slice(1)
+    if (!hash) return
+    try {
+      const { sql: hashSql, engine: hashEngine } = JSON.parse(atob(decodeURIComponent(hash)))
+      if (typeof hashSql === 'string') setSql(hashSql)
+      if (typeof hashEngine === 'string') handleEngineChange(hashEngine as DbEngine)
+    } catch { /* malformed hash — ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Keep URL hash in sync with current SQL + engine (replaceState — no browser history entry)
+  useEffect(() => {
+    const encoded = encodeURIComponent(btoa(JSON.stringify({ sql, engine })))
+    window.history.replaceState(null, '', `#${encoded}`)
+  }, [sql, engine])
+
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 2000)
+    })
+  }
 
   // Open shortcuts modal on `?` (ignore when focus is in an input/textarea)
   useEffect(() => {
@@ -311,6 +365,7 @@ export default function App() {
 
   const handleEngineChange = async (e: DbEngine) => {
     setEngine(e);
+    updateTabEngine(activeTabId, e);
     setResult(null);
     setTables([]);
     if (e === "sqlite") {
@@ -339,6 +394,17 @@ export default function App() {
       setSql(text);
     }
     e.target.value = "";
+  };
+
+  const handleDuckDBImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    await initDuckDB();
+    const snippet = await registerDuckDBFile(file);
+    setSql(snippet);
+    setEngine("duckdb");
+    setTables(await getDuckDBTables());
   };
 
   const handleExportXLSX = () => {
@@ -492,7 +558,7 @@ export default function App() {
 
         <div className="flex-1" />
 
-        {/* Run button — has visible label "Run", aria-label adds keyboard shortcut context */}
+        {/* Run button */}
         <button
           onClick={handleRun}
           disabled={isLoading}
@@ -502,52 +568,110 @@ export default function App() {
         >
           <Play size={13} fill="currentColor" aria-hidden="true" />
           Run
-          <span className="text-xs opacity-60 ml-0.5" aria-hidden="true">
-            ⌘↵
-          </span>
+          <span className="text-xs opacity-60 ml-0.5" aria-hidden="true">⌘↵</span>
         </button>
 
-        {/* Import button */}
+        {/* Import dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => { setShowImportMenu(v => !v); setShowExportMenu(false) }}
+            aria-label="Import file"
+            aria-haspopup="true"
+            aria-expanded={showImportMenu}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors"
+          >
+            <Upload size={13} aria-hidden="true" />
+            Import
+            <ChevronDown size={11} aria-hidden="true" />
+          </button>
+          {showImportMenu && (
+            <div
+              className="absolute left-0 top-full mt-1 z-50 w-52 bg-[var(--ide-surface)] border border-[var(--ide-border)] rounded-lg shadow-xl py-1 text-sm"
+              onMouseLeave={() => setShowImportMenu(false)}
+            >
+              <button
+                onClick={() => { setShowImportMenu(false); fileInputRef.current?.click() }}
+                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[var(--ide-surface2)] text-left"
+              >
+                <Upload size={12} aria-hidden="true" />
+                <div>
+                  <div className="text-[var(--ide-text)]">SQLite / SQL file</div>
+                  <div className="text-[var(--ide-text-4)] text-xs">.db .sqlite .sqlite3 .sql</div>
+                </div>
+              </button>
+              <button
+                onClick={() => { setShowImportMenu(false); duckdbImportRef.current?.click() }}
+                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[var(--ide-surface2)] text-left"
+              >
+                <Upload size={12} aria-hidden="true" />
+                <div>
+                  <div className="text-[var(--ide-text)]">Data file → DuckDB</div>
+                  <div className="text-[var(--ide-text-4)] text-xs">.csv .tsv .json .parquet</div>
+                </div>
+              </button>
+            </div>
+          )}
+        </div>
+        <input ref={fileInputRef} type="file" accept=".db,.sqlite,.sqlite3,.sql" className="hidden" aria-hidden="true" tabIndex={-1} onChange={handleImport} />
+        <input ref={duckdbImportRef} type="file" accept=".csv,.tsv,.json,.ndjson,.parquet" className="hidden" aria-hidden="true" tabIndex={-1} onChange={handleDuckDBImport} />
+
+        {/* Format button */}
         <button
-          onClick={() => fileInputRef.current?.click()}
-          aria-label="Import SQL or SQLite file"
+          onClick={() => editorRef.current?.formatSQL()}
+          aria-label="Format SQL"
           className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors"
         >
-          <Upload size={13} aria-hidden="true" />
-          Import
+          <WandSparkles size={13} aria-hidden="true" />
+          Format
         </button>
-        {/* Hidden file input — labelled via the visible button above */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".db,.sqlite,.sqlite3,.sql"
-          className="hidden"
-          aria-hidden="true"
-          tabIndex={-1}
-          onChange={handleImport}
-        />
 
-        {/* Export buttons */}
+        {/* Share button */}
         <button
-          onClick={handleExportXLSX}
-          disabled={!result || !!result.error || !result.columns.length}
-          aria-label="Export query results as XLSX"
-          aria-disabled={!result || !!result.error || !result.columns.length}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors disabled:opacity-40"
+          onClick={handleShare}
+          aria-label="Copy shareable link"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors"
         >
-          <Download size={13} aria-hidden="true" />
-          XLSX
+          {shareCopied ? <Check size={13} className="text-green-400" aria-hidden="true" /> : <Link size={13} aria-hidden="true" />}
+          {shareCopied ? 'Copied!' : 'Share'}
         </button>
-        <button
-          onClick={handleExportCSV}
-          disabled={!result || !!result.error || !result.columns.length}
-          aria-label="Export query results as CSV"
-          aria-disabled={!result || !!result.error || !result.columns.length}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors disabled:opacity-40"
-        >
-          <Download size={13} aria-hidden="true" />
-          CSV
-        </button>
+
+        {/* Export dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => { setShowExportMenu(v => !v); setShowImportMenu(false) }}
+            disabled={!result || !!result.error || !result.columns.length}
+            aria-label="Export query results"
+            aria-haspopup="true"
+            aria-expanded={showExportMenu}
+            aria-disabled={!result || !!result.error || !result.columns.length}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors disabled:opacity-40"
+          >
+            <Download size={13} aria-hidden="true" />
+            Export
+            <ChevronDown size={11} aria-hidden="true" />
+          </button>
+          {showExportMenu && (
+            <div
+              className="absolute right-0 top-full mt-1 z-50 w-40 bg-[var(--ide-surface)] border border-[var(--ide-border)] rounded-lg shadow-xl py-1 text-sm"
+              onMouseLeave={() => setShowExportMenu(false)}
+            >
+              <button
+                onClick={() => { setShowExportMenu(false); handleExportXLSX() }}
+                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[var(--ide-surface2)] text-left text-[var(--ide-text)]"
+              >
+                <Download size={12} aria-hidden="true" />
+                Excel (.xlsx)
+              </button>
+              <button
+                onClick={() => { setShowExportMenu(false); handleExportCSV() }}
+                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[var(--ide-surface2)] text-left text-[var(--ide-text)]"
+              >
+                <Download size={12} aria-hidden="true" />
+                CSV (.csv)
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Save as favorite — inline name-input flow */}
         {showFavNameInput ? (
@@ -616,39 +740,21 @@ export default function App() {
           History
         </button>
 
-        {/* AI Help toggle — only shown when AI is enabled */}
-        {aiEnabled && (
-          <div className="relative group">
-            <button
-              onClick={() => {
-                if (!auth.token && auth.authEnabled) return;
-                setShowAIPanel((v) => !v);
-              }}
-              aria-label={showAIPanel ? "Hide AI assistant" : "Show AI assistant"}
-              aria-pressed={showAIPanel}
-              aria-disabled={!auth.token && auth.authEnabled}
-              className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm transition-colors ${
-                showAIPanel
-                  ? "bg-purple-600/20 border-purple-500 text-purple-300"
-                  : !auth.token && auth.authEnabled
-                    ? "bg-[var(--ide-surface2)] border-[var(--ide-border)] text-[var(--ide-text-4)] cursor-default"
-                    : "bg-[var(--ide-surface2)] border-[var(--ide-border)] hover:bg-[var(--ide-surface3)] text-purple-400 hover:text-purple-300"
-              }`}
-            >
-              <Sparkles size={13} aria-hidden="true" />
-              AI Help
-            </button>
-            {/* Tooltip shown when not logged in */}
-            {!auth.token && auth.authEnabled && (
-              <div
-                role="tooltip"
-                className="pointer-events-none absolute right-0 top-full mt-1.5 z-50 w-48 rounded-lg border border-[var(--ide-border)] bg-[var(--ide-surface)] px-3 py-2 text-xs text-[var(--ide-text-2)] shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                Sign in to use the AI assistant.
-                <div className="absolute -top-1 right-4 w-2 h-2 rotate-45 bg-[var(--ide-surface)] border-l border-t border-[var(--ide-border)]" />
-              </div>
-            )}
-          </div>
+        {/* AI Help toggle — only shown when AI is enabled AND user is logged in */}
+        {aiEnabled && auth.token && (
+          <button
+            onClick={() => setShowAIPanel((v) => !v)}
+            aria-label={showAIPanel ? "Hide AI assistant" : "Show AI assistant"}
+            aria-pressed={showAIPanel}
+            className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm transition-colors ${
+              showAIPanel
+                ? "bg-purple-600/20 border-purple-500 text-purple-300"
+                : "bg-[var(--ide-surface2)] border-[var(--ide-border)] hover:bg-[var(--ide-surface3)] text-purple-400 hover:text-purple-300"
+            }`}
+          >
+            <Sparkles size={13} aria-hidden="true" />
+            AI Help
+          </button>
         )}
 
         {/* Keyboard shortcuts reference */}
@@ -745,6 +851,39 @@ export default function App() {
 
         {/* Center panel — editor + results */}
         <div ref={centerPanelRef} className="flex flex-col flex-1 overflow-hidden">
+          {/* Tab bar */}
+          <div className="flex items-center border-b border-[var(--ide-border)] shrink-0 overflow-x-auto" style={{ background: 'var(--ide-surface)' }}>
+            {tabs.map((tab) => (
+              <div
+                key={tab.id}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs border-r border-[var(--ide-border)] cursor-pointer shrink-0 group ${
+                  tab.id === activeTabId
+                    ? 'bg-[var(--ide-bg)] text-[var(--ide-text)]'
+                    : 'text-[var(--ide-text-3)] hover:text-[var(--ide-text-2)] hover:bg-[var(--ide-surface2)]'
+                }`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                <span className="max-w-[120px] truncate">{tab.name}</span>
+                {tabs.length > 1 && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); closeTab(tab.id) }}
+                    aria-label={`Close ${tab.name}`}
+                    className="opacity-0 group-hover:opacity-100 hover:text-red-400 transition-opacity ml-0.5"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              onClick={() => { addTab(); }}
+              aria-label="New query tab"
+              className="px-2.5 py-1.5 text-[var(--ide-text-3)] hover:text-[var(--ide-text)] hover:bg-[var(--ide-surface2)] shrink-0"
+            >
+              <Plus size={13} />
+            </button>
+          </div>
+
           {/* Editor region */}
           <div
             role="region"
@@ -753,11 +892,13 @@ export default function App() {
             style={{ height: `${editorHeightPct}%` }}
           >
             <Editor
+              ref={editorRef}
               value={sql}
-              onChange={setSql}
+              onChange={(val) => { setSql(val); updateTabSql(activeTabId, val) }}
               onRun={() => runRef.current()}
               isDark={theme === "dark"}
               schema={schemaMap}
+              dialect={engine === 'mysql' || engine === 'mariadb' || engine === 'postgresql' || engine === 'sqlite' ? engine : 'sqlite'}
             />
           </div>
 

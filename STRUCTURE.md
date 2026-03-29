@@ -58,14 +58,17 @@ sql-online-ide/
 
 ### `src/App.tsx`
 The root component and main orchestrator. Responsibilities:
-- Toolbar layout (engine selector, run button, import/export, history toggle, theme toggle)
+- Toolbar layout (engine selector, run button, import/export dropdowns, format, share, history toggle, theme toggle)
 - Engine initialisation and switching (`handleEngineChange`)
 - Query execution routing (`handleRun`) — dispatches to the right engine wrapper
 - Table browsing and dropping
-- Import (`.db`, `.sqlite`, `.sqlite3`, `.sql`) and export (`.xlsx`, `.csv`)
+- Import (`.db`, `.sqlite`, `.sqlite3`, `.sql` via dropdown; `.csv`, `.tsv`, `.json`, `.parquet` → DuckDB)
+- Export (`.xlsx`, `.csv` via dropdown)
 - Right panel (history/favorites) and sidebar toggle state
 - Schema map computation for CodeMirror autocompletion (`schemaMap` state, wired into `<Editor>`)
 - Resizable editor/results split via drag handle (`editorHeightPct` state)
+- Multi-tab editor: tab bar above editor, syncs `sql`/`engine` with active `QueryTab` in store
+- URL hash sync: SQL + engine encoded on change, restored on first load (`Share` button copies the URL)
 
 ### `src/store.ts`
 Zustand store, persisted to `localStorage`. Contains:
@@ -86,6 +89,7 @@ All shared types. The canonical source of truth for:
 - `TableInfo`, `ColumnInfo` — schema metadata
 - `HistoryEntry`, `FavoriteQuery`, `SavedConnection`, `RemoteConnection`
 - `ChartType`
+- `QueryTab` — id, name, sql, engine (for multi-tab editor)
 
 ### `src/engines/`
 Each file is a thin wrapper that exposes a consistent async API:
@@ -93,6 +97,7 @@ Each file is a thin wrapper that exposes a consistent async API:
 - `run*Query(sql)` — executes SQL, returns `QueryResult`
 - `get*Tables()` — returns `TableInfo[]`
 - `get*Columns(tableName)` — returns `ColumnInfo[]`
+- `registerDuckDBFile(file)` — registers a local CSV/JSON/Parquet file into DuckDB's VFS and returns a ready-to-run `CREATE TABLE AS SELECT *` snippet
 
 ### `server/index.ts`
 Unified Express API surface:

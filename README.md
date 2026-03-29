@@ -7,9 +7,10 @@ Inspired by SQLiteOnline, but fully open source and without the limitations of t
 
 ## Features
 
-- ✍️ **SQL Editor** — CodeMirror 6 with syntax highlighting, autocompletion, and `Ctrl+Enter` / `Cmd+Enter` to run
+- ✍️ **SQL Editor** — CodeMirror 6 with syntax highlighting, schema-aware autocompletion, and `Ctrl+Enter` / `Cmd+Enter` to run
 - 🗄️ **Multiple engines** — SQLite, DuckDB, MySQL, MariaDB, PostgreSQL
 - 🖥️ **In-browser execution** — SQLite and DuckDB run entirely via WebAssembly (no server needed)
+- 🗂️ **Multi-tab editor** — open and switch between multiple query buffers, each with its own engine
 - 🔎 **Table explorer** — browse tables and columns in the sidebar; click a table to preview its data
 - 🗑️ **Drop tables** — delete a table directly from the UI without writing SQL
 - 🕘 **Query history** — last 100 queries; synced to the server when logged in (survives cache clears and private browsing)
@@ -17,8 +18,11 @@ Inspired by SQLiteOnline, but fully open source and without the limitations of t
 - 🔌 **Saved connections** — store MySQL/MariaDB/PostgreSQL connection configs locally
 - 🤖 **AI SQL assistant** — describe what you want in plain language, get a ready-to-run SQL query (requires an Anthropic API key and a user account)
 - 📊 **Charts** — visualize results as bar, line, pie, or bubble charts
-- 📥 **Import** — load `.db`, `.sqlite`, `.sqlite3`, or `.sql` files
-- 📤 **Export** — download query results as `.xlsx`
+- 🔍 **Execution plan** — run `EXPLAIN QUERY PLAN` (SQLite) or `EXPLAIN ANALYZE` (DuckDB) with one click
+- ✨ **Format SQL** — reformat the editor content with a single click, dialect-aware
+- 🔗 **Share query** — copy a shareable URL encoding the current SQL and engine
+- 📥 **Import** — load `.db`, `.sqlite`, `.sqlite3`, `.sql` files, or drop `.csv`, `.json`, `.parquet` directly into DuckDB
+- 📤 **Export** — download query results as `.xlsx` or `.csv`
 - 🌓 **Light / dark theme** — Tokyo Night dark theme + clean light mode
 - 🔐 **Optional authentication** — enable login via `AUTH_USERS` env var; unlocks server-side sync and AI assistant
 
@@ -84,6 +88,7 @@ sql-online-ide/
 - **Editor** — CodeMirror 6
 - **Charts** — Chart.js + react-chartjs-2
 - **State** — Zustand (with localStorage persistence + optional server sync)
+- **SQL formatting** — sql-formatter
 - **Export** — xlsx
 - **Backend** — Express, mysql2, pg
 - **Auth** — JWT (jsonwebtoken + bcryptjs)

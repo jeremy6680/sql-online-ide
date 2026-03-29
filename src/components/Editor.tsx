@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react'
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, gutter } from '@codemirror/view'
 import { EditorState, Compartment } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
@@ -6,6 +6,7 @@ import { sql } from '@codemirror/lang-sql'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { autocompletion, completionKeymap } from '@codemirror/autocomplete'
 import { bracketMatching, foldGutter, foldKeymap } from '@codemirror/language'
+import { format } from 'sql-formatter'
 
 interface EditorProps {
   value: string
@@ -13,6 +14,11 @@ interface EditorProps {
   onRun: () => void
   isDark: boolean
   schema?: Record<string, string[]>
+  dialect?: 'sqlite' | 'mysql' | 'mariadb' | 'postgresql' | 'duckdb'
+}
+
+export interface EditorHandle {
+  formatSQL: () => void
 }
 
 const themeCompartment = new Compartment()
@@ -33,10 +39,36 @@ function buildThemeExtension(isDark: boolean) {
   return isDark ? [base, oneDark] : [base]
 }
 
-export function Editor({ value, onChange, onRun, isDark, schema }: EditorProps) {
+import type { SqlLanguage } from 'sql-formatter'
+
+// sql-formatter dialect names differ slightly from our DbEngine type
+const FORMATTER_DIALECT: Record<string, SqlLanguage> = {
+  sqlite: 'sqlite',
+  duckdb: 'sql', // no native duckdb dialect — standard SQL is close enough
+  mysql: 'mysql',
+  mariadb: 'mariadb',
+  postgresql: 'postgresql',
+}
+
+export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
+  { value, onChange, onRun, isDark, schema, dialect = 'sqlite' },
+  ref
+) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const onRunRef = useRef(onRun)
+
+  useImperativeHandle(ref, () => ({
+    formatSQL() {
+      const view = viewRef.current
+      if (!view) return
+      const raw = view.state.doc.toString()
+      try {
+        const formatted = format(raw, { language: FORMATTER_DIALECT[dialect] ?? 'sql', tabWidth: 2, keywordCase: 'upper' })
+        view.dispatch({ changes: { from: 0, to: raw.length, insert: formatted } })
+      } catch { /* unparseable SQL — leave as-is */ }
+    }
+  }))
 
   useEffect(() => { onRunRef.current = onRun }, [onRun])
 
@@ -100,4 +132,4 @@ export function Editor({ value, onChange, onRun, isDark, schema }: EditorProps) 
   }, [schema])
 
   return <div ref={containerRef} className="h-full w-full overflow-hidden" />
-}
+})
