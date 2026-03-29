@@ -117,7 +117,7 @@ export default function App() {
   const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[0];
 
   const [activeResultTab, setActiveResultTab] = useState<
-    "table" | "chart" | "schema" | "plan"
+    "table" | "chart" | "schema"
   >("table");
   const [showConnectionModal, setShowConnectionModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -134,7 +134,6 @@ export default function App() {
   const [shareCopied, setShareCopied] = useState(false);
   const [showImportMenu, setShowImportMenu] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [showRunMenu, setShowRunMenu] = useState(false);
   const [editorHeightPct, setEditorHeightPct] = useState(50);
   const centerPanelRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -364,23 +363,6 @@ export default function App() {
 
   runRef.current = handleRun;
 
-  const handleExplain = useCallback(async () => {
-    if (!sql.trim()) return
-    const supportsExplain = engine === 'sqlite' || engine === 'duckdb'
-    if (!supportsExplain) return
-    const explainSQL = engine === 'duckdb'
-      ? `EXPLAIN ANALYZE ${sql}`
-      : `EXPLAIN QUERY PLAN ${sql}`
-    setIsLoading(true)
-    setResult(null)
-    let res
-    if (engine === 'sqlite') res = await runSQLiteQuery(explainSQL)
-    else { await initDuckDB(); res = await runDuckDBQuery(explainSQL) }
-    setResult(res)
-    setIsLoading(false)
-    setActiveResultTab('plan' as typeof activeResultTab)
-  }, [sql, engine, setIsLoading, setResult])
-
   const handleEngineChange = async (e: DbEngine) => {
     setEngine(e);
     updateTabEngine(activeTabId, e);
@@ -576,47 +558,18 @@ export default function App() {
 
         <div className="flex-1" />
 
-        {/* Run button — with optional Explain in dropdown (SQLite/DuckDB only) */}
-        <div className="relative flex items-stretch rounded-lg overflow-hidden">
-          <button
-            onClick={handleRun}
-            disabled={isLoading}
-            aria-label="Run query (Ctrl+Enter)"
-            aria-disabled={isLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-sm font-medium disabled:opacity-50 transition-colors text-white"
-          >
-            <Play size={13} fill="currentColor" aria-hidden="true" />
-            Run
-            <span className="text-xs opacity-60 ml-0.5" aria-hidden="true">⌘↵</span>
-          </button>
-          {(engine === 'sqlite' || engine === 'duckdb') && (
-            <>
-              <button
-                onClick={() => setShowRunMenu(v => !v)}
-                disabled={isLoading}
-                aria-label="More run options"
-                aria-haspopup="true"
-                aria-expanded={showRunMenu}
-                className="flex items-center px-1.5 bg-green-700 hover:bg-green-600 text-white disabled:opacity-50 transition-colors border-l border-green-500"
-              >
-                <ChevronDown size={11} aria-hidden="true" />
-              </button>
-              {showRunMenu && (
-                <div
-                  className="absolute left-0 top-full mt-1 z-50 w-44 bg-[var(--ide-surface)] border border-[var(--ide-border)] rounded-lg shadow-xl py-1 text-sm"
-                  onMouseLeave={() => setShowRunMenu(false)}
-                >
-                  <button
-                    onClick={() => { setShowRunMenu(false); handleExplain() }}
-                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[var(--ide-surface2)] text-left text-[var(--ide-text)]"
-                  >
-                    Explain query plan
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
+        {/* Run button */}
+        <button
+          onClick={handleRun}
+          disabled={isLoading}
+          aria-label="Run query (Ctrl+Enter)"
+          aria-disabled={isLoading}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors text-white"
+        >
+          <Play size={13} fill="currentColor" aria-hidden="true" />
+          Run
+          <span className="text-xs opacity-60 ml-0.5" aria-hidden="true">⌘↵</span>
+        </button>
 
         {/* Import dropdown */}
         <div className="relative">
@@ -1024,15 +977,6 @@ export default function App() {
               >
                 <Network size={11} /> Schema
               </button>
-              {result && !result.error && activeResultTab === "plan" && (
-                <button
-                  onClick={() => setActiveResultTab("plan")}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs bg-[var(--ide-surface2)] text-[var(--ide-text)]"
-                  aria-pressed={true}
-                >
-                  Plan
-                </button>
-              )}
               {/* Chart type selector — only visible in chart tab */}
               {activeResultTab === "chart" && (
                 <div
@@ -1092,18 +1036,6 @@ export default function App() {
                     chartType={chartType}
                     isDark={theme === "dark"}
                   />
-                ) : activeResultTab === "plan" ? (
-                  <div className="p-4 overflow-auto h-full font-mono text-xs text-[var(--ide-text-2)] whitespace-pre leading-relaxed">
-                    {result.rows.map((row, i) => (
-                      <div key={i} className="py-0.5">
-                        {row.map((cell, j) => (
-                          <span key={j} className={j === row.length - 1 ? "text-[var(--ide-text)]" : "text-[var(--ide-text-3)] mr-3"}>
-                            {cell === null ? '' : String(cell)}
-                          </span>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
                 ) : (
                   // Schema tab is always accessible, even without a query result
                   <SchemaView
