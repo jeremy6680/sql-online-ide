@@ -575,32 +575,31 @@ export default function App() {
 
         <div className="flex-1" />
 
-        {/* Run button — has visible label "Run", aria-label adds keyboard shortcut context */}
-        <button
-          onClick={handleRun}
-          disabled={isLoading}
-          aria-label="Run query (Ctrl+Enter)"
-          aria-disabled={isLoading}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors text-white"
-        >
-          <Play size={13} fill="currentColor" aria-hidden="true" />
-          Run
-          <span className="text-xs opacity-60 ml-0.5" aria-hidden="true">
-            ⌘↵
-          </span>
-        </button>
-
-        {/* Explain button — only for SQLite and DuckDB */}
-        {(engine === 'sqlite' || engine === 'duckdb') && (
+        {/* Run button — split button: Run (left) + optional Explain dropdown (right, SQLite/DuckDB only) */}
+        <div className={`flex items-stretch ${(engine === 'sqlite' || engine === 'duckdb') ? 'rounded-lg overflow-hidden' : ''}`}>
           <button
-            onClick={handleExplain}
+            onClick={handleRun}
             disabled={isLoading}
-            aria-label="Show execution plan"
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors disabled:opacity-50"
+            aria-label="Run query (Ctrl+Enter)"
+            aria-disabled={isLoading}
+            className={`flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-sm font-medium disabled:opacity-50 transition-colors text-white ${(engine === 'sqlite' || engine === 'duckdb') ? 'rounded-none' : 'rounded-lg'}`}
           >
-            Explain
+            <Play size={13} fill="currentColor" aria-hidden="true" />
+            Run
+            <span className="text-xs opacity-60 ml-0.5" aria-hidden="true">⌘↵</span>
           </button>
-        )}
+          {(engine === 'sqlite' || engine === 'duckdb') && (
+            <button
+              onClick={handleExplain}
+              disabled={isLoading}
+              aria-label="Show execution plan"
+              className="flex items-center px-2 bg-green-700 hover:bg-green-600 text-white text-xs disabled:opacity-50 transition-colors border-l border-green-500"
+              title="Explain query plan"
+            >
+              Explain
+            </button>
+          )}
+        </div>
 
         {/* Import dropdown */}
         <div className="relative">

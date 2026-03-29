@@ -5,6 +5,21 @@ Most recent entries first.
 
 ---
 
+## [2026] sql-formatter for in-editor SQL formatting
+
+**Decision:** `sql-formatter` (npm) is used for the "Format" button. Formatting is applied on demand (button click), not live.
+
+**Rationale:**
+- Dialect-aware: supports sqlite, mysql, mariadb, postgresql, and generic SQL (used for DuckDB)
+- Applied via `EditorView.dispatch()` on the CodeMirror instance — no editor recreation needed
+- `EditorHandle` interface exposes `formatSQL()` via `useImperativeHandle`/`forwardRef`
+
+**Trade-off:**
+- Adds ~200 KB to the bundle (tree-shaken)
+- The formatter may rewrite valid but unusual SQL in unexpected ways — user can always undo (`Ctrl+Z`)
+
+---
+
 ## [2025] WASM engines run entirely in the browser (no server for SQLite/DuckDB)
 
 **Decision:** SQLite (sql.js) and DuckDB (duckdb-wasm) run as WebAssembly in the browser. No server roundtrip for these engines.
