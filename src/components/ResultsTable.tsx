@@ -19,7 +19,7 @@ export function ResultsTable({ result }: ResultsTableProps) {
 
   if (result.error) {
     return (
-      <div className="p-4 text-red-400 bg-red-900/20 rounded m-2 font-mono text-sm">
+      <div role="alert" className="p-4 text-red-400 bg-red-900/20 rounded m-2 font-mono text-sm">
         <span className="font-bold">Error: </span>{result.error}
       </div>
     )

@@ -42,7 +42,7 @@ function TableItem({ table, engine, remoteConnection, onBrowse, onDrop }: {
 
   if (confirmDrop) {
     return (
-      <div className="px-2 py-2 bg-red-900/20 border-l-2 border-red-500">
+      <div role="alert" className="px-2 py-2 bg-red-900/20 border-l-2 border-red-500">
         <div className="flex items-center gap-1 text-xs text-red-400 mb-2">
           <AlertTriangle size={11} />
           Drop <span className="font-mono font-bold">{table.name}</span>?

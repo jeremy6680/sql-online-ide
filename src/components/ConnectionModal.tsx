@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, Database, Star, Trash2, Save } from 'lucide-react'
 import type { DbEngine, RemoteConnection, SavedConnection } from '../types'
 
@@ -24,6 +24,33 @@ export function ConnectionModal({
   engine, onConnect, onClose, currentConnection,
   savedConnections, onSaveConnection, onDeleteConnection
 }: ConnectionModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const modal = modalRef.current
+    if (!modal) return
+
+    const focusable = modal.querySelectorAll<HTMLElement>(
+      'button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    first?.focus()
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { onClose(); return }
+      if (e.key !== 'Tab') return
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last?.focus() }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first?.focus() }
+      }
+    }
+
+    modal.addEventListener('keydown', handleKeyDown)
+    return () => modal.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
   const [form, setForm] = useState<RemoteConnection>(currentConnection || {
     host: 'localhost',
     port: engine === 'postgresql' ? 5432 : 3306,
@@ -68,12 +95,18 @@ export function ConnectionModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-[var(--ide-bg)] border border-[var(--ide-border)] rounded-xl w-[480px] shadow-2xl">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm" aria-hidden="true">
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="connection-modal-title"
+        className="bg-[var(--ide-bg)] border border-[var(--ide-border)] rounded-xl w-[480px] shadow-2xl"
+      >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--ide-border)]">
           <div className="flex items-center gap-2">
             <Database size={16} className="text-blue-400" />
-            <span className="font-semibold capitalize">{engine} Connection</span>
+            <span id="connection-modal-title" className="font-semibold capitalize">{engine} Connection</span>
           </div>
           <button onClick={onClose} className="text-[var(--ide-text-3)] hover:text-[var(--ide-text)]"><X size={16} /></button>
         </div>
