@@ -34,7 +34,7 @@ Prioritised backlog. Items at the top of each section are highest priority.
 - [ ] **Query result diffing** — compare two query results side by side (added/removed rows highlighted). Useful for dbt-style before/after comparisons.
 - [ ] **Schema documentation panel** — add a description field to tables/columns (stored in localStorage or a sidecar JSON). Useful for learning and for the DataBird bootcamp context.
 - [ ] **dbt-style query organisation** — group favorite queries into folders (e.g. "staging", "marts"). Maps to the medallion architecture mental model.
-- [x] **Execution plan viewer** — for SQLite (`EXPLAIN QUERY PLAN`) and DuckDB (`EXPLAIN ANALYZE`), parse and display the output in a readable tree or diagram.
+- [ ] **Execution plan viewer** — for SQLite (`EXPLAIN QUERY PLAN`) and DuckDB (`EXPLAIN ANALYZE`), parse and display the output in a readable tree or diagram. *(attempted and removed — UX was poor)*
 - [x] **Query formatting (Prettier SQL)** — a "Format" button that reformats the SQL in the editor using a SQL formatter library.
 - [x] **Share query via URL** — encode the current SQL + engine in the URL hash so queries can be shared as links.
 

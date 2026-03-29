@@ -58,9 +58,9 @@ sql-online-ide/
 
 ### `src/App.tsx`
 The root component and main orchestrator. Responsibilities:
-- Toolbar layout (engine selector, run/explain split button, import/export dropdowns, format, share, history toggle, theme toggle)
+- Toolbar layout (engine selector, run button, import/export dropdowns, format, share, history toggle, theme toggle)
 - Engine initialisation and switching (`handleEngineChange`)
-- Query execution routing (`handleRun`) and execution plan (`handleExplain`) — dispatches to the right engine wrapper
+- Query execution routing (`handleRun`) — dispatches to the right engine wrapper
 - Table browsing and dropping
 - Import (`.db`, `.sqlite`, `.sqlite3`, `.sql` via dropdown; `.csv`, `.tsv`, `.json`, `.parquet` → DuckDB)
 - Export (`.xlsx`, `.csv` via dropdown)
