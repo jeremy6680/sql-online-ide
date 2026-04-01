@@ -16,9 +16,10 @@ sql-online-ide/
 │   │   ├── LoginPage.tsx       # Login modal (JWT-based auth)
 │   │   ├── SchemaView.tsx      # ERD-style schema diagram (SVG)
 │   │   ├── ShortcutsModal.tsx  # Keyboard shortcuts reference modal (open with `?`)
-│   │   └── AIHelpPanel.tsx     # AI SQL assistant panel (natural language → SQL)
+│   │   ├── AIHelpPanel.tsx     # AI SQL assistant panel (natural language → SQL)
+│   │   └── CertPanel.tsx       # ENI SQL certification prep panel (question generation + auto-correction)
 │   ├── engines/                # Database engine wrappers
-│   │   ├── sqlite.ts           # sql.js (WASM) — init, query, tables, columns, file load
+│   │   ├── sqlite.ts           # sql.js (WASM) — init, query, tables, columns, file load, isolated execution (cert)
 │   │   ├── duckdb.ts           # duckdb-wasm — init, query, tables, columns
 │   │   └── remote.ts           # HTTP client for the Express proxy (query, tables, columns, test)
 │   ├── store.ts                # Zustand global state (persisted to localStorage)
@@ -31,6 +32,7 @@ sql-online-ide/
 │   ├── index.ts                # Express app — unified /api/* endpoints, static serving
 │   ├── auth.ts                 # JWT auth middleware, credential validation, token signing
 │   ├── userData.ts             # File-based per-user store (history + favorites → data/users/)
+│   ├── cert.ts                 # ENI SQL cert question generator — Claude prompt + JSON parsing
 │   ├── mysql.ts                # MySQL/MariaDB connector (mysql2) + router
 │   └── postgres.ts             # PostgreSQL connector (pg) + router
 │
@@ -69,6 +71,8 @@ The root component and main orchestrator. Responsibilities:
 - Resizable editor/results split via drag handle (`editorHeightPct` state)
 - Multi-tab editor: tab bar above editor, syncs `sql`/`engine` with active `QueryTab` in store
 - URL hash sync: SQL + engine encoded on change, restored on first load (`Share` button copies the URL)
+- Settings dropdown (keyboard shortcuts, theme toggle, auth) replacing three individual toolbar buttons
+- ENI Cert panel toggle + horizontal resize handle (`certPanelWidth` state, 280–700 px)
 
 ### `src/store.ts`
 Zustand store, persisted to `localStorage`. Contains:
@@ -78,7 +82,7 @@ Zustand store, persisted to `localStorage`. Contains:
 - Favorite queries (named, engine-tagged) — also synced to server when logged in
 - Remote connection (active session — **password included, not ideal for long-term storage**)
 - Saved connections (name + engine + RemoteConnection shape)
-- Panel visibility (sidebar, history panel)
+- Panel visibility (sidebar, history panel, `certPanelOpen`)
 - Theme (`dark` | `light`)
 - Auth state (JWT token, username, authEnabled flag)
 
@@ -90,6 +94,7 @@ All shared types. The canonical source of truth for:
 - `HistoryEntry`, `FavoriteQuery`, `SavedConnection`, `RemoteConnection`
 - `ChartType`
 - `QueryTab` — id, name, sql, engine (for multi-tab editor)
+- `CertQuestion` and variants (`CertQuestionQCU`, `CertQuestionQCM`, `CertQuestionPractical`) — ENI cert prep types
 
 ### `src/engines/`
 Each file is a thin wrapper that exposes a consistent async API:
@@ -110,6 +115,7 @@ Unified Express API surface:
 | `/api/user/data` | POST | Yes | Save user's history + favorites to server |
 | `/api/ai/sql` | POST | Yes | Translate natural-language prompt to SQL (requires `ANTHROPIC_API_KEY`) |
 | `/api/ai/status` | GET | No | Whether AI assistant is configured |
+| `/api/cert/question` | POST | Yes | Generate an ENI SQL exam question via Claude (requires `ANTHROPIC_API_KEY`) |
 | `/api/query` | POST | No | Run SQL on MySQL/MariaDB/PostgreSQL |
 | `/api/tables` | POST | No | List tables for a connection |
 | `/api/columns` | POST | No | List columns for a table |

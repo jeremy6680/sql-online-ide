@@ -17,6 +17,7 @@ Inspired by SQLiteOnline, but fully open source and without the limitations of t
 - ⭐ **Favorites** — save and name queries for quick reuse; synced to the server when logged in
 - 🔌 **Saved connections** — store MySQL/MariaDB/PostgreSQL connection configs locally
 - 🤖 **AI SQL assistant** — describe what you want in plain language, get a ready-to-run SQL query (requires an Anthropic API key and a user account)
+- 🎓 **ENI SQL Certification Prep** — AI-generated practice questions in the style of the ENI SQL exam (QCU, QCM, and practical cases with auto-correction); requires an Anthropic API key and a user account
 - 📊 **Charts** — visualize results as bar, line, pie, or bubble charts
 - 🔍 **Execution plan** — run `EXPLAIN QUERY PLAN` (SQLite) or `EXPLAIN ANALYZE` (DuckDB) with one click
 - ✨ **Format SQL** — reformat the editor content with a single click, dialect-aware
@@ -67,6 +68,7 @@ sql-online-ide/
 │   └── App.tsx
 ├── server/
 │   ├── index.ts          # Express server (port 3001)
+│   ├── cert.ts           # ENI SQL certification question generator (Claude API)
 │   ├── mysql.ts          # MySQL / MariaDB routes
 │   └── postgres.ts       # PostgreSQL routes
 └── public/
@@ -144,7 +146,7 @@ Coolify handles SSL (Let's Encrypt) and zero-downtime redeploys on each push to 
 | `PORT`              | `3001`        | Port the Express server listens on                                                             |
 | `AUTH_USERS`        | _(unset)_     | JSON array of `{username, password}` objects. If unset, the app is open to everyone            |
 | `JWT_SECRET`        | _(fallback)_  | Secret used to sign JWT tokens. **Set a strong random value in production**                    |
-| `ANTHROPIC_API_KEY` | _(unset)_     | Anthropic API key for the AI SQL assistant. If unset, the "AI Help" button is hidden           |
+| `ANTHROPIC_API_KEY` | _(unset)_     | Anthropic API key for the AI assistant and ENI certification prep. If unset, both buttons are hidden |
 
 **AUTH_USERS formats:**
 ```

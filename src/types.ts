@@ -81,3 +81,47 @@ export interface QueryTab {
   sql: string;
   engine: DbEngine;
 }
+
+// ─── ENI SQL Certification Prep ───────────────────────────────────────────────
+
+export type CertPart = 1 | 2 | 3 | 4;
+export type CertQuestionType = 'qcu' | 'qcm' | 'practical';
+
+export interface CertChoice {
+  label: 'A' | 'B' | 'C' | 'D';
+  /** Plain text or SQL snippet displayed as the choice */
+  text: string;
+}
+
+interface CertQuestionBase {
+  id: string;
+  part: CertPart;
+  type: CertQuestionType;
+  /** Optional scenario description shown above the question */
+  context?: string;
+  questionText: string;
+  explanation: string;
+}
+
+export interface CertQuestionQCU extends CertQuestionBase {
+  type: 'qcu';
+  choices: CertChoice[];
+  correctAnswers: string[];
+}
+
+export interface CertQuestionQCM extends CertQuestionBase {
+  type: 'qcm';
+  choices: CertChoice[];
+  correctAnswers: string[];
+}
+
+/** Practical (cas pratique) question — user writes SQL against a given schema */
+export interface CertQuestionPractical extends CertQuestionBase {
+  type: 'practical';
+  /** CREATE TABLE + INSERT statements to set up the scenario */
+  schemaSQL: string;
+  /** Correct SQL query (hidden until submission, used client-side for comparison) */
+  correctSQL: string;
+}
+
+export type CertQuestion = CertQuestionQCU | CertQuestionQCM | CertQuestionPractical;

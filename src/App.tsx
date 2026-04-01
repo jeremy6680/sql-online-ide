@@ -24,6 +24,8 @@ import {
   X,
   Plus,
   ChevronDown,
+  BookOpen,
+  Settings,
 } from "lucide-react";
 import { Editor, type EditorHandle } from "./components/Editor";
 import { ResultsTable } from "./components/ResultsTable";
@@ -35,6 +37,7 @@ import { ConnectionModal } from "./components/ConnectionModal";
 import { SchemaView } from "./components/SchemaView";
 import { LoginModal } from "./components/LoginPage";
 import { AIHelpPanel } from "./components/AIHelpPanel";
+import { CertPanel } from "./components/CertPanel";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 
 import { useStore } from "./store";
@@ -112,6 +115,8 @@ export default function App() {
     setActiveTab,
     updateTabSql,
     updateTabEngine,
+    certPanelOpen,
+    setCertPanelOpen,
   } = useStore();
 
   const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[0];
@@ -130,6 +135,8 @@ export default function App() {
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [aiEnabled, setAIEnabled] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [certPanelWidth, setCertPanelWidth] = useState(384);
   const [schemaMap, setSchemaMap] = useState<Record<string, string[]>>({});
   const [shareCopied, setShareCopied] = useState(false);
   const [showImportMenu, setShowImportMenu] = useState(false);
@@ -757,53 +764,88 @@ export default function App() {
           </button>
         )}
 
-        {/* Keyboard shortcuts reference */}
-        <button
-          onClick={() => setShowShortcuts(true)}
-          aria-label="Show keyboard shortcuts"
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors"
-        >
-          <Keyboard size={13} aria-hidden="true" />
-        </button>
-
-        {/* Theme toggle */}
-        <button
-          onClick={toggleTheme}
-          aria-label={
-            theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
-          }
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors"
-        >
-          {theme === "dark" ? (
-            <Sun size={13} aria-hidden="true" />
-          ) : (
-            <Moon size={13} aria-hidden="true" />
-          )}
-        </button>
-
-        {/* Auth button — Sign in when not logged in, username+logout when logged in */}
-        {auth.token ? (
+        {/* ENI Certification prep — only shown when AI is enabled AND user is logged in */}
+        {aiEnabled && auth.token && (
           <button
-            onClick={logout}
-            aria-label={`Sign out (${auth.username})`}
-            title={`Signed in as ${auth.username}`}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/40 border border-[var(--ide-border)] rounded-lg text-sm transition-colors"
+            onClick={() => setCertPanelOpen(!certPanelOpen)}
+            aria-label={certPanelOpen ? "Fermer la préparation ENI" : "Ouvrir la préparation ENI SQL"}
+            aria-pressed={certPanelOpen}
+            className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm transition-colors ${
+              certPanelOpen
+                ? "dark:bg-emerald-600/20 bg-emerald-100 dark:border-emerald-500 border-emerald-500 dark:text-emerald-300 text-emerald-700"
+                : "bg-[var(--ide-surface2)] border-[var(--ide-border)] hover:bg-[var(--ide-surface3)] dark:text-emerald-400 text-emerald-600 dark:hover:text-emerald-300 hover:text-emerald-700"
+            }`}
           >
-            <span className="text-xs text-[var(--ide-text-2)]">
-              {auth.username}
-            </span>
-            <LogOut size={13} aria-hidden="true" />
-          </button>
-        ) : (
-          <button
-            onClick={() => setShowLoginModal(true)}
-            aria-label="Sign in"
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors"
-          >
-            <LogIn size={13} aria-hidden="true" />
-            Sign in
+            <BookOpen size={13} aria-hidden="true" />
+            ENI
           </button>
         )}
+
+        {/* Settings dropdown — groups keyboard shortcuts, theme toggle, and auth */}
+        <div className="relative">
+          <button
+            onClick={() => setShowSettingsMenu((v) => !v)}
+            aria-label="Settings"
+            aria-haspopup="true"
+            aria-expanded={showSettingsMenu}
+            className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm transition-colors ${
+              showSettingsMenu
+                ? "bg-[var(--ide-surface3)] border-[var(--ide-border)]"
+                : "bg-[var(--ide-surface2)] border-[var(--ide-border)] hover:bg-[var(--ide-surface3)]"
+            }`}
+          >
+            <Settings size={13} aria-hidden="true" />
+            {auth.token && (
+              <span className="text-xs text-[var(--ide-text-2)] max-w-[80px] truncate">
+                {auth.username}
+              </span>
+            )}
+          </button>
+          {showSettingsMenu && (
+            <div
+              className="absolute right-0 top-full mt-1 z-50 w-52 bg-[var(--ide-surface)] border border-[var(--ide-border)] rounded-lg shadow-xl py-1 text-sm"
+              onMouseLeave={() => setShowSettingsMenu(false)}
+            >
+              <button
+                onClick={() => { setShowSettingsMenu(false); setShowShortcuts(true); }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--ide-surface2)] text-left text-[var(--ide-text)]"
+              >
+                <Keyboard size={13} aria-hidden="true" />
+                Raccourcis clavier
+              </button>
+              <button
+                onClick={toggleTheme}
+                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--ide-surface2)] text-left text-[var(--ide-text)]"
+              >
+                {theme === "dark" ? (
+                  <Sun size={13} aria-hidden="true" />
+                ) : (
+                  <Moon size={13} aria-hidden="true" />
+                )}
+                {theme === "dark" ? "Mode clair" : "Mode sombre"}
+              </button>
+              <div className="border-t border-[var(--ide-border)] my-1" />
+              {auth.token ? (
+                <button
+                  onClick={() => { setShowSettingsMenu(false); logout(); }}
+                  title={`Connecté en tant que ${auth.username}`}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--ide-surface2)] text-left text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300"
+                >
+                  <LogOut size={13} aria-hidden="true" />
+                  Se déconnecter
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setShowSettingsMenu(false); setShowLoginModal(true); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--ide-surface2)] text-left text-[var(--ide-text)]"
+                >
+                  <LogIn size={13} aria-hidden="true" />
+                  Se connecter
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </header>
 
       {/* ── Main Content ───────────────────────────────────────────── */}
@@ -1158,6 +1200,48 @@ export default function App() {
               }}
             />
           </div>
+        )}
+
+        {/* ENI Certification Prep Panel */}
+        {certPanelOpen && aiEnabled && (
+          <>
+            {/* Horizontal resize handle — drag left to widen, right to narrow */}
+            <div
+              role="separator"
+              aria-label="Redimensionner le panneau ENI"
+              aria-orientation="vertical"
+              className="w-1.5 shrink-0 cursor-col-resize bg-[var(--ide-border)] hover:bg-blue-500/40 transition-colors active:bg-blue-500/60"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                const startX = e.clientX;
+                const startWidth = certPanelWidth;
+                const onMove = (ev: MouseEvent) => {
+                  const newWidth = Math.min(
+                    700,
+                    Math.max(280, startWidth + (startX - ev.clientX)),
+                  );
+                  setCertPanelWidth(newWidth);
+                };
+                const onUp = () => {
+                  document.removeEventListener("mousemove", onMove);
+                  document.removeEventListener("mouseup", onUp);
+                };
+                document.addEventListener("mousemove", onMove);
+                document.addEventListener("mouseup", onUp);
+              }}
+            />
+            <div
+              role="complementary"
+              aria-label="Préparation certification ENI SQL"
+              className="shrink-0 overflow-hidden flex flex-col"
+              style={{ width: certPanelWidth }}
+            >
+              <CertPanel
+                token={auth.token}
+                onClose={() => setCertPanelOpen(false)}
+              />
+            </div>
+          </>
         )}
       </div>
 

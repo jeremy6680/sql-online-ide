@@ -131,6 +131,61 @@ export function getSQLiteColumns(tableName: string): ColumnInfo[] {
 }
 
 /**
+ * Runs a SQL query in an isolated, temporary SQLite database that is discarded
+ * after the call. Used by the ENI cert panel to evaluate user answers against
+ * exam schema data without touching the user's main database.
+ */
+export async function runSQLiteIsolated(
+  setupSQL: string,
+  querySQL: string,
+): Promise<QueryResult> {
+  const SQL = await initSqlJs({ locateFile: () => "/sql-wasm.wasm" });
+  const tempDb = new SQL.Database();
+  const start = performance.now();
+  try {
+    // Run schema setup (CREATE TABLE + INSERT) — ignore FK constraints
+    const setupStatements = setupSQL
+      .split(";")
+      .map((s) => s.trim())
+      .filter((s) => {
+        if (!s) return false;
+        const upper = s.toUpperCase().replace(/\s+/g, " ");
+        if (upper.includes("ALTER TABLE") && upper.includes("FOREIGN KEY"))
+          return false;
+        return true;
+      });
+    for (const stmt of setupStatements) {
+      tempDb.run(stmt);
+    }
+
+    // Run the user / expected query
+    const results = tempDb.exec(querySQL.trim());
+    const elapsed = performance.now() - start;
+
+    if (results.length === 0) {
+      return { columns: [], rows: [], rowCount: 0, executionTime: elapsed };
+    }
+    const r = results[0];
+    return {
+      columns: r.columns,
+      rows: r.values,
+      rowCount: r.values.length,
+      executionTime: elapsed,
+    };
+  } catch (err) {
+    return {
+      columns: [],
+      rows: [],
+      rowCount: 0,
+      executionTime: performance.now() - start,
+      error: String(err),
+    };
+  } finally {
+    tempDb.close();
+  }
+}
+
+/**
  * Returns all foreign key relationships across all user tables.
  * Uses PRAGMA foreign_key_list per table — SQLite stores FK info table-by-table.
  * Note: FKs are declared but not enforced by default in SQLite (PRAGMA foreign_keys = ON).
