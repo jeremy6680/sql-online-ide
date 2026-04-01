@@ -27,6 +27,8 @@ import {
   isAuthEnabled,
 } from "./auth.js";
 import { loadUserData, saveUserData } from "./userData.js";
+import { generateCertQuestion } from "./cert.js";
+import type { CertPart, CertQuestionType } from "../src/types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -154,6 +156,39 @@ Return ONLY the raw SQL — no markdown, no code fences, no explanation.`;
 // GET /api/ai/status — lets the frontend know if AI is available
 app.get("/api/ai/status", (_req, res) => {
   res.json({ aiEnabled: !!process.env.ANTHROPIC_API_KEY });
+});
+
+// ─── ENI SQL Certification prep endpoint ─────────────────────────────────────
+
+// POST /api/cert/question — generates a random ENI SQL exam question via Claude
+app.post("/api/cert/question", requireAuth, async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    res.status(503).json({ error: "AI non configuré (ANTHROPIC_API_KEY manquante)." });
+    return;
+  }
+
+  const { part, type } = req.body as { part?: number; type?: string };
+
+  const validParts: CertPart[] = [1, 2, 3, 4];
+  const validTypes: CertQuestionType[] = ["qcu", "qcm", "practical"];
+
+  const resolvedPart: CertPart =
+    validParts.includes(part as CertPart)
+      ? (part as CertPart)
+      : validParts[Math.floor(Math.random() * validParts.length)];
+
+  const resolvedType: CertQuestionType =
+    validTypes.includes(type as CertQuestionType)
+      ? (type as CertQuestionType)
+      : validTypes[Math.floor(Math.random() * validTypes.length)];
+
+  try {
+    const question = await generateCertQuestion(apiKey, resolvedPart, resolvedType);
+    res.json({ question });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
 });
 
 // Mount engine-specific routers

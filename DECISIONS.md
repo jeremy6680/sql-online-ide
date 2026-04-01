@@ -5,6 +5,38 @@ Most recent entries first.
 
 ---
 
+## [2026] ENI SQL certification prep: server-side generation, client-side evaluation
+
+**Decision:** Exam questions are generated server-side (Claude API, `POST /api/cert/question`). For practical (cas pratique) questions, SQL evaluation happens entirely client-side: the browser runs both the correct SQL and the user's SQL in an isolated, ephemeral `sql.js` database instance (`runSQLiteIsolated`), then compares the result sets.
+
+**Rationale:**
+- Generation needs Claude — keeping the API key on the server is non-negotiable (same pattern as `/api/ai/sql`)
+- Evaluation does **not** need the server: sql.js already runs as WASM in the browser. Creating a fresh `sql.js` `Database()` per question avoids adding a SQLite dependency on the server and avoids round-trips
+- The isolated instance is closed immediately after evaluation — the exam schema never pollutes the user's main database
+- QCU/QCM answers are included in the server response and evaluated client-side (this is a learning tool, not a proctored exam — the trade-off is accepted)
+- Result comparison normalises column order (case-insensitive sort) and row order (lexicographic sort on stringified values), making it ORDER BY-agnostic
+
+**Trade-off:**
+- Technically the user could inspect the network response to see the correct answer for QCU/QCM; acceptable for a self-study context
+- Claude occasionally generates `correctSQL` that does not perfectly match the prose description — no server-side validation of generated questions. If Claude's SQL is wrong the comparison still works (user matches Claude's answer, which may itself be imperfect)
+- `runSQLiteIsolated` re-initialises the WASM module per call; `initSqlJs` is cached by the browser so the overhead is small in practice
+
+---
+
+## [2026] Settings dropdown replaces individual toolbar buttons for theme, shortcuts, and auth
+
+**Decision:** The keyboard-shortcuts button, theme toggle, and login/logout button are collapsed into a single `⚙️` Settings dropdown in the toolbar.
+
+**Rationale:**
+- The toolbar was growing wide enough to require horizontal scrolling on smaller screens
+- These three actions are infrequent (set once per session) compared to Run, Format, History, AI Help, ENI — burying them one level deeper has minimal UX cost
+- The dropdown pattern already exists in the codebase (Import, Export) — no new pattern needed
+
+**Trade-off:**
+- Theme toggle is now one extra click away; power users who switch themes frequently may prefer the old button. Accepted: the target user switches theme at most once per session
+
+---
+
 ## [2026] sql-formatter for in-editor SQL formatting
 
 **Decision:** `sql-formatter` (npm) is used for the "Format" button. Formatting is applied on demand (button click), not live.

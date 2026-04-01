@@ -59,6 +59,8 @@ interface AppState {
   toggleHistory: () => void
   showSidebar: boolean
   toggleSidebar: () => void
+  certPanelOpen: boolean
+  setCertPanelOpen: (open: boolean) => void
 
   // Theme
   theme: 'dark' | 'light'
@@ -125,6 +127,8 @@ export const useStore = create<AppState>()(
       toggleHistory: () => set((state) => ({ showHistory: !state.showHistory })),
       showSidebar: true,
       toggleSidebar: () => set((state) => ({ showSidebar: !state.showSidebar })),
+      certPanelOpen: false,
+      setCertPanelOpen: (open) => set({ certPanelOpen: open }),
 
       theme: 'dark',
       toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),

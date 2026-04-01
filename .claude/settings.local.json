@@ -12,7 +12,13 @@
       "Bash(git init:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git checkout:*)",
+      "Bash(npm run:*)",
+      "Bash(grep -n \"export function get.*Columns\\\\|export async function get.*Columns\" /Users/jeremymarchandeau/Code/personal/projects/sql-online-ide/src/engines/*.ts /Users/jeremymarchandeau/Code/personal/projects/sql-online-ide/src/engines/*.tsx)",
+      "Bash(grep -n \"export.*Columns\" /Users/jeremymarchandeau/Code/personal/projects/sql-online-ide/src/engines/*.ts)",
+      "Skill(commit-commands:commit)",
+      "Skill(commit-commands:commit:*)"
     ]
   }
 }
