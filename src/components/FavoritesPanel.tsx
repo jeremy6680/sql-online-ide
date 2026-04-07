@@ -1,4 +1,5 @@
 import { Star, Trash2, Database } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { FavoriteQuery, DbEngine } from '../types'
 
 const ENGINE_COLORS: Record<DbEngine, string> = {
@@ -16,12 +17,14 @@ interface FavoritesPanelProps {
 }
 
 export function FavoritesPanel({ favorites, onSelect, onDelete }: FavoritesPanelProps) {
+  const { t } = useTranslation()
+
   if (favorites.length === 0) {
     return (
       <div className="p-4 text-xs text-[var(--ide-text-4)] text-center">
         <Star size={24} className="mx-auto mb-2 opacity-30" />
-        No favorites yet.<br />
-        Click ★ in the toolbar to save a query.
+        {t('favorites.empty')}<br />
+        {t('favorites.emptyHint')}
       </div>
     )
   }

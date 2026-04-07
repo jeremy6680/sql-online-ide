@@ -1,23 +1,25 @@
 import { useEffect } from 'react'
 import { X, Keyboard } from 'lucide-react'
-
-const SHORTCUTS = [
-  { keys: ['Ctrl', 'Enter'], mac: ['⌘', '↵'], description: 'Run query' },
-  { keys: ['Ctrl', 'Z'], mac: ['⌘', 'Z'], description: 'Undo' },
-  { keys: ['Ctrl', 'Shift', 'Z'], mac: ['⌘', '⇧', 'Z'], description: 'Redo' },
-  { keys: ['Ctrl', '/'], mac: ['⌘', '/'], description: 'Toggle line comment' },
-  { keys: ['Ctrl', 'F'], mac: ['⌘', 'F'], description: 'Find in editor' },
-  { keys: ['Tab'], mac: ['Tab'], description: 'Accept autocomplete suggestion' },
-  { keys: ['Escape'], mac: ['Escape'], description: 'Close modal / dismiss autocomplete' },
-  { keys: ['?'], mac: ['?'], description: 'Open this shortcuts reference' },
-]
+import { useTranslation } from 'react-i18next'
 
 interface ShortcutsModalProps {
   onClose: () => void
 }
 
 export function ShortcutsModal({ onClose }: ShortcutsModalProps) {
+  const { t } = useTranslation()
   const isMac = navigator.platform.toUpperCase().includes('MAC')
+
+  const SHORTCUTS = [
+    { keys: ['Ctrl', 'Enter'], mac: ['⌘', '↵'], descKey: 'shortcuts.runQuery' },
+    { keys: ['Ctrl', 'Z'], mac: ['⌘', 'Z'], descKey: 'shortcuts.undo' },
+    { keys: ['Ctrl', 'Shift', 'Z'], mac: ['⌘', '⇧', 'Z'], descKey: 'shortcuts.redo' },
+    { keys: ['Ctrl', '/'], mac: ['⌘', '/'], descKey: 'shortcuts.toggleComment' },
+    { keys: ['Ctrl', 'F'], mac: ['⌘', 'F'], descKey: 'shortcuts.findInEditor' },
+    { keys: ['Tab'], mac: ['Tab'], descKey: 'shortcuts.acceptAutocomplete' },
+    { keys: ['Escape'], mac: ['Escape'], descKey: 'shortcuts.closeDismiss' },
+    { keys: ['?'], mac: ['?'], descKey: 'shortcuts.openShortcuts' },
+  ]
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -43,17 +45,17 @@ export function ShortcutsModal({ onClose }: ShortcutsModalProps) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--ide-border)]">
           <div className="flex items-center gap-2">
             <Keyboard size={16} className="text-blue-400" />
-            <span id="shortcuts-modal-title" className="font-semibold">Keyboard shortcuts</span>
+            <span id="shortcuts-modal-title" className="font-semibold">{t('shortcuts.title')}</span>
           </div>
-          <button onClick={onClose} aria-label="Close shortcuts" className="text-[var(--ide-text-3)] hover:text-[var(--ide-text)]">
+          <button onClick={onClose} aria-label={t('shortcuts.close')} className="text-[var(--ide-text-3)] hover:text-[var(--ide-text)]">
             <X size={16} />
           </button>
         </div>
 
         <div className="p-5 space-y-1.5">
-          {SHORTCUTS.map(({ keys, mac, description }) => (
-            <div key={description} className="flex items-center justify-between gap-4">
-              <span className="text-sm text-[var(--ide-text-2)]">{description}</span>
+          {SHORTCUTS.map(({ keys, mac, descKey }) => (
+            <div key={descKey} className="flex items-center justify-between gap-4">
+              <span className="text-sm text-[var(--ide-text-2)]">{t(descKey)}</span>
               <div className="flex items-center gap-1 shrink-0">
                 {(isMac ? mac : keys).map((k) => (
                   <kbd

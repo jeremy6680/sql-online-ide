@@ -1,0 +1,183 @@
+{
+  "settings": {
+    "shortcuts": "Keyboard shortcuts",
+    "lightMode": "Light mode",
+    "darkMode": "Dark mode",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "signedInAs": "Signed in as {{username}}",
+    "language": "Language"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "close": "Close shortcuts",
+    "hint": "Press ? anywhere to open this panel",
+    "runQuery": "Run query",
+    "undo": "Undo",
+    "redo": "Redo",
+    "toggleComment": "Toggle line comment",
+    "findInEditor": "Find in editor",
+    "acceptAutocomplete": "Accept autocomplete suggestion",
+    "closeDismiss": "Close modal / dismiss autocomplete",
+    "openShortcuts": "Open this shortcuts reference"
+  },
+  "toolbar": {
+    "run": "Run",
+    "import": "Import",
+    "format": "Format",
+    "share": "Share",
+    "shareCopied": "Copied!",
+    "export": "Export",
+    "history": "History",
+    "favorites": "Favorites",
+    "aiHelp": "AI Help",
+    "test": "Test",
+    "showTableExplorer": "Show table explorer",
+    "hideTableExplorer": "Hide table explorer",
+    "favoriteName": "Favorite name",
+    "favoriteNamePlaceholder": "Favorite name…"
+  },
+  "import": {
+    "sqliteFile": "SQLite / SQL file",
+    "dataFile": "Data file → DuckDB"
+  },
+  "export": {
+    "excel": "Excel (.xlsx)",
+    "csv": "CSV (.csv)"
+  },
+  "results": {
+    "error": "Error:",
+    "empty": "Query executed successfully. No rows returned.",
+    "executing": "Executing query…",
+    "noQuery": "Run a query to see results (Ctrl+Enter / ⌘+Enter)",
+    "rowCount_one": "{{count}} row",
+    "rowCount_other": "{{count}} rows",
+    "colCount_one": "{{count}} col",
+    "colCount_other": "{{count}} cols",
+    "statement": "statement {{index}}/{{total}}",
+    "page": "Page {{page}} / {{total}}",
+    "tabs": {
+      "table": "Table",
+      "chart": "Chart",
+      "schema": "Schema"
+    }
+  },
+  "rightPanel": {
+    "ariaLabel": "History and favorites"
+  },
+  "sidebar": {
+    "tables": "Tables",
+    "refresh": "Refresh",
+    "noTables": "No tables found.",
+    "noTablesHint": "Run a CREATE TABLE statement to get started.",
+    "loading": "Loading...",
+    "noColumns": "No columns found",
+    "browseData": "Browse data",
+    "clickToPreview": "Click to preview data",
+    "dropTable": "Drop table",
+    "dropConfirm": "Drop {{name}}?",
+    "cancel": "Cancel",
+    "drop": "Drop"
+  },
+  "history": {
+    "empty": "No query history yet.",
+    "entries_one": "{{count}} entry",
+    "entries_other": "{{count}} entries",
+    "clear": "Clear",
+    "rows": "{{count}} rows"
+  },
+  "favorites": {
+    "empty": "No favorites yet.",
+    "emptyHint": "Click ★ in the toolbar to save a query."
+  },
+  "ai": {
+    "title": "AI SQL Assistant",
+    "context_one": "{{count}} table in context",
+    "context_other": "{{count}} tables in context",
+    "label": "Describe what you want in plain language",
+    "placeholder": "e.g. Count the number of rides per car and get the total contribution. Show only the top 10.",
+    "generate": "Generate SQL",
+    "generating": "Generating…",
+    "generatedSQL": "Generated SQL",
+    "useQuery": "Use this query",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "noTables": "No tables loaded yet. Run a query or load a database first so the AI has schema context."
+  },
+  "cert": {
+    "title": {
+      "setup": "SQL Test Prep",
+      "exam": "SQL Mock Exam"
+    },
+    "setup": {
+      "description": "AI generates an original question in the spirit of the SQL test. Choose a part and type, or leave as Random.",
+      "partLabel": "Part",
+      "typeLabel": "Question type",
+      "random": "Random",
+      "generateQuestion": "Generate a question",
+      "or": "or",
+      "generateExam": "Generate a mock exam (20 questions)",
+      "estimatedCost": "Estimated cost"
+    },
+    "loading": {
+      "question": "Generating question…",
+      "exam": "Generating exam…",
+      "examDetail": "20 questions generated in batches — allow about 15 seconds."
+    },
+    "question": {
+      "progress": "Question {{current}} / {{total}}",
+      "multipleAnswers": "Multiple answers possible",
+      "yourSQL": "Your SQL query",
+      "sqlPlaceholder": "Write your SQL query here…",
+      "checking": "Checking…",
+      "validate": "Submit",
+      "validateAnswer": "Submit my answer"
+    },
+    "feedback": {
+      "correct": "Correct!",
+      "incorrect": "Incorrect answer",
+      "explanation": "Explanation",
+      "showSolution": "Show solution",
+      "hideSolution": "Hide solution",
+      "nextQuestion": "Next question",
+      "seeResults": "See results"
+    },
+    "exam": {
+      "scoreTitle": "Current exam score",
+      "sessionScore": "Session score",
+      "passed": "Passed!",
+      "needsImprovement": "Needs improvement",
+      "breakdown": "Breakdown by part",
+      "backToHome": "Back to home"
+    },
+    "schema": {
+      "title": "Data schema",
+      "copyTitle": "Copy schema SQL to paste in editor",
+      "copyAriaLabel": "Copy schema SQL"
+    },
+    "part": {
+      "1": "Part 1 – Simple Queries",
+      "2": "Part 2 – Complex Queries",
+      "3": "Part 3 – Data Modification",
+      "4": "Part 4 – Views"
+    },
+    "type": {
+      "qcu": "MCQ – single answer",
+      "qcm": "MCQ – multiple answers",
+      "practical": "Practical case"
+    },
+    "panel": {
+      "close": "Close test prep panel",
+      "openAriaLabel": "Open SQL test prep",
+      "closeAriaLabel": "Close SQL test prep",
+      "resizeAriaLabel": "Resize SQL test prep panel",
+      "ariaLabel": "SQL test prep"
+    },
+    "sqlError": "SQL error: {{error}}",
+    "practical": {
+      "rowMismatch": "Rows obtained: {{actual}} · Expected: {{expected}}",
+      "colMismatch": "Columns obtained: {{actual}} · Expected: {{expected}}",
+      "resultMismatch": "The result does not match the expected output."
+    }
+  }
+}

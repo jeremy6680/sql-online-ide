@@ -1,0 +1,183 @@
+{
+  "settings": {
+    "shortcuts": "Raccourcis clavier",
+    "lightMode": "Mode clair",
+    "darkMode": "Mode sombre",
+    "signIn": "Se connecter",
+    "signOut": "Se déconnecter",
+    "signedInAs": "Connecté en tant que {{username}}",
+    "language": "Langue"
+  },
+  "shortcuts": {
+    "title": "Raccourcis clavier",
+    "close": "Fermer les raccourcis",
+    "hint": "Appuyez sur ? pour ouvrir ce panneau",
+    "runQuery": "Exécuter la requête",
+    "undo": "Annuler",
+    "redo": "Rétablir",
+    "toggleComment": "Commenter / décommenter la ligne",
+    "findInEditor": "Chercher dans l'éditeur",
+    "acceptAutocomplete": "Accepter la suggestion",
+    "closeDismiss": "Fermer la fenêtre / annuler l'autocomplétion",
+    "openShortcuts": "Ouvrir ce référentiel de raccourcis"
+  },
+  "toolbar": {
+    "run": "Exécuter",
+    "import": "Importer",
+    "format": "Formater",
+    "share": "Partager",
+    "shareCopied": "Copié !",
+    "export": "Exporter",
+    "history": "Historique",
+    "favorites": "Favoris",
+    "aiHelp": "Aide IA",
+    "test": "Test",
+    "showTableExplorer": "Afficher l'explorateur de tables",
+    "hideTableExplorer": "Masquer l'explorateur de tables",
+    "favoriteName": "Nom du favori",
+    "favoriteNamePlaceholder": "Nom du favori…"
+  },
+  "import": {
+    "sqliteFile": "Fichier SQLite / SQL",
+    "dataFile": "Fichier de données → DuckDB"
+  },
+  "export": {
+    "excel": "Excel (.xlsx)",
+    "csv": "CSV (.csv)"
+  },
+  "results": {
+    "error": "Erreur :",
+    "empty": "Requête exécutée. Aucune ligne retournée.",
+    "executing": "Exécution de la requête…",
+    "noQuery": "Exécutez une requête pour voir les résultats (Ctrl+Entrée / ⌘+Entrée)",
+    "rowCount_one": "{{count}} ligne",
+    "rowCount_other": "{{count}} lignes",
+    "colCount_one": "{{count}} col",
+    "colCount_other": "{{count}} cols",
+    "statement": "instruction {{index}}/{{total}}",
+    "page": "Page {{page}} / {{total}}",
+    "tabs": {
+      "table": "Tableau",
+      "chart": "Graphique",
+      "schema": "Schéma"
+    }
+  },
+  "rightPanel": {
+    "ariaLabel": "Historique et favoris"
+  },
+  "sidebar": {
+    "tables": "Tables",
+    "refresh": "Actualiser",
+    "noTables": "Aucune table trouvée.",
+    "noTablesHint": "Exécutez un CREATE TABLE pour commencer.",
+    "loading": "Chargement...",
+    "noColumns": "Aucune colonne trouvée",
+    "browseData": "Parcourir les données",
+    "clickToPreview": "Cliquer pour prévisualiser",
+    "dropTable": "Supprimer la table",
+    "dropConfirm": "Supprimer {{name}} ?",
+    "cancel": "Annuler",
+    "drop": "Supprimer"
+  },
+  "history": {
+    "empty": "Aucun historique de requêtes.",
+    "entries_one": "{{count}} entrée",
+    "entries_other": "{{count}} entrées",
+    "clear": "Effacer",
+    "rows": "{{count}} lignes"
+  },
+  "favorites": {
+    "empty": "Aucun favori enregistré.",
+    "emptyHint": "Cliquez sur ★ dans la barre pour sauvegarder une requête."
+  },
+  "ai": {
+    "title": "Assistant SQL IA",
+    "context_one": "{{count}} table en contexte",
+    "context_other": "{{count}} tables en contexte",
+    "label": "Décrivez ce que vous souhaitez en langage naturel",
+    "placeholder": "ex. Compter le nombre de trajets par voiture et obtenir la contribution totale. Afficher uniquement le top 10.",
+    "generate": "Générer le SQL",
+    "generating": "Génération…",
+    "generatedSQL": "SQL généré",
+    "useQuery": "Utiliser cette requête",
+    "copy": "Copier",
+    "copied": "Copié !",
+    "noTables": "Aucune table chargée. Exécutez une requête ou chargez une base de données pour que l'IA ait du contexte."
+  },
+  "cert": {
+    "title": {
+      "setup": "Préparation Test SQL",
+      "exam": "Examen blanc SQL"
+    },
+    "setup": {
+      "description": "L'IA génère une question originale dans l'esprit du test SQL. Choisissez une partie et un type, ou laissez sur Aléatoire.",
+      "partLabel": "Partie",
+      "typeLabel": "Type de question",
+      "random": "Aléatoire",
+      "generateQuestion": "Générer une question",
+      "or": "ou",
+      "generateExam": "Générer un examen blanc (20 questions)",
+      "estimatedCost": "Coût estimé"
+    },
+    "loading": {
+      "question": "Génération de la question…",
+      "exam": "Génération de l'examen…",
+      "examDetail": "20 questions générées par lots — comptez environ 15 secondes."
+    },
+    "question": {
+      "progress": "Question {{current}} / {{total}}",
+      "multipleAnswers": "Plusieurs réponses possibles",
+      "yourSQL": "Votre requête SQL",
+      "sqlPlaceholder": "Écrivez votre requête SQL ici…",
+      "checking": "Vérification…",
+      "validate": "Valider",
+      "validateAnswer": "Valider ma réponse"
+    },
+    "feedback": {
+      "correct": "Bonne réponse !",
+      "incorrect": "Réponse incorrecte",
+      "explanation": "Explication",
+      "showSolution": "Voir la solution",
+      "hideSolution": "Masquer la solution",
+      "nextQuestion": "Question suivante",
+      "seeResults": "Voir les résultats"
+    },
+    "exam": {
+      "scoreTitle": "Score de l'examen en cours",
+      "sessionScore": "Score de la session",
+      "passed": "Réussi !",
+      "needsImprovement": "À améliorer",
+      "breakdown": "Détail par partie",
+      "backToHome": "Retour à l'accueil"
+    },
+    "schema": {
+      "title": "Schéma de données",
+      "copyTitle": "Copier le SQL du schéma pour le coller dans l'éditeur",
+      "copyAriaLabel": "Copier le SQL du schéma"
+    },
+    "part": {
+      "1": "Partie 1 – Requêtes simples",
+      "2": "Partie 2 – Requêtes complexes",
+      "3": "Partie 3 – Mise à jour des données",
+      "4": "Partie 4 – Vues"
+    },
+    "type": {
+      "qcu": "QCU (choix unique)",
+      "qcm": "QCM (choix multiple)",
+      "practical": "Cas pratique"
+    },
+    "panel": {
+      "close": "Fermer le panneau de préparation",
+      "openAriaLabel": "Ouvrir la préparation Test SQL",
+      "closeAriaLabel": "Fermer la préparation Test SQL",
+      "resizeAriaLabel": "Redimensionner le panneau Test SQL",
+      "ariaLabel": "Préparation Test SQL"
+    },
+    "sqlError": "Erreur SQL : {{error}}",
+    "practical": {
+      "rowMismatch": "Lignes obtenues : {{actual}} · Attendu : {{expected}}",
+      "colMismatch": "Colonnes obtenues : {{actual}} · Attendu : {{expected}}",
+      "resultMismatch": "Le résultat ne correspond pas au résultat attendu."
+    }
+  }
+}

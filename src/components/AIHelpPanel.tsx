@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Sparkles, Copy, Play, Loader2, AlertCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { DbEngine, RemoteConnection, TableInfo, ColumnInfo } from "../types";
 import { getSQLiteColumns } from "../engines/sqlite";
 import { getDuckDBColumns } from "../engines/duckdb";
@@ -51,6 +52,7 @@ async function fetchSchema(
 }
 
 export function AIHelpPanel({ engine, tables, remoteConnection, token, onUseQuery }: Props) {
+  const { t } = useTranslation();
   const [prompt, setPrompt] = useState("");
   const [generatedSQL, setGeneratedSQL] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -118,10 +120,10 @@ export function AIHelpPanel({ engine, tables, remoteConnection, token, onUseQuer
         style={{ background: "var(--ide-surface)" }}
       >
         <Sparkles size={13} className="text-purple-400" aria-hidden="true" />
-        <span className="text-xs font-medium text-[var(--ide-text)]">AI SQL Assistant</span>
+        <span className="text-xs font-medium text-[var(--ide-text)]">{t('ai.title')}</span>
         {tables.length > 0 && (
           <span className="ml-auto text-[10px] text-[var(--ide-text-4)]">
-            {tables.length} table{tables.length !== 1 ? "s" : ""} in context
+            {t('ai.context', { count: tables.length })}
           </span>
         )}
       </div>
@@ -133,7 +135,7 @@ export function AIHelpPanel({ engine, tables, remoteConnection, token, onUseQuer
             htmlFor="ai-prompt"
             className="text-xs text-[var(--ide-text-3)]"
           >
-            Describe what you want in plain language
+            {t('ai.label')}
           </label>
           <textarea
             id="ai-prompt"
@@ -144,13 +146,13 @@ export function AIHelpPanel({ engine, tables, remoteConnection, token, onUseQuer
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleGenerate();
             }}
             rows={4}
-            placeholder="e.g. Count the number of rides per car and get the total contribution. Show only the top 10."
+            placeholder={t('ai.placeholder')}
             className="w-full resize-none rounded-lg border border-[var(--ide-border)] bg-[var(--ide-bg)] px-3 py-2 text-xs text-[var(--ide-text)] placeholder:text-[var(--ide-text-4)] focus:outline-none focus:border-purple-500 transition-colors"
           />
           <button
             onClick={handleGenerate}
             disabled={isLoading || !prompt.trim()}
-            aria-label="Generate SQL (Ctrl+Enter)"
+            aria-label={t('ai.generate')}
             className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 rounded-lg text-xs font-medium text-white transition-colors"
           >
             {isLoading ? (
@@ -158,7 +160,7 @@ export function AIHelpPanel({ engine, tables, remoteConnection, token, onUseQuer
             ) : (
               <Sparkles size={12} aria-hidden="true" />
             )}
-            {isLoading ? "Generating…" : "Generate SQL"}
+            {isLoading ? t('ai.generating') : t('ai.generate')}
             {!isLoading && (
               <span className="opacity-60 ml-0.5" aria-hidden="true">⌘↵</span>
             )}
@@ -179,7 +181,7 @@ export function AIHelpPanel({ engine, tables, remoteConnection, token, onUseQuer
         {/* Generated SQL result */}
         {generatedSQL && (
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-[var(--ide-text-3)]">Generated SQL</span>
+            <span className="text-xs text-[var(--ide-text-3)]">{t('ai.generatedSQL')}</span>
             <pre
               className="rounded-lg border border-[var(--ide-border)] bg-[var(--ide-bg)] p-2.5 text-xs text-[var(--ide-text)] overflow-x-auto whitespace-pre-wrap font-mono"
             >
@@ -189,18 +191,18 @@ export function AIHelpPanel({ engine, tables, remoteConnection, token, onUseQuer
               <button
                 onClick={() => onUseQuery(generatedSQL)}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-500 rounded-lg text-xs font-medium text-white transition-colors"
-                aria-label="Insert query into editor"
+                aria-label={t('ai.useQuery')}
               >
                 <Play size={11} fill="currentColor" aria-hidden="true" />
-                Use this query
+                {t('ai.useQuery')}
               </button>
               <button
                 onClick={handleCopy}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-xs transition-colors"
-                aria-label="Copy generated SQL"
+                aria-label={t('ai.copy')}
               >
                 <Copy size={11} aria-hidden="true" />
-                {copied ? "Copied!" : "Copy"}
+                {copied ? t('ai.copied') : t('ai.copy')}
               </button>
             </div>
           </div>
@@ -209,7 +211,7 @@ export function AIHelpPanel({ engine, tables, remoteConnection, token, onUseQuer
         {/* Empty state — no tables loaded yet */}
         {tables.length === 0 && (
           <p className="text-xs text-[var(--ide-text-4)] text-center mt-4">
-            No tables loaded yet. Run a query or load a database first so the AI has schema context.
+            {t('ai.noTables')}
           </p>
         )}
       </div>

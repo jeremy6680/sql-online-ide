@@ -74,19 +74,21 @@ app.get("/api/user/data", requireAuth, (req, res) => {
   res.json(loadUserData(username));
 });
 
-// POST /api/user/data — replaces this user's history, favorites, and saved connections
+// POST /api/user/data — replaces this user's history, favorites, saved connections, and language
 app.post("/api/user/data", requireAuth, (req, res) => {
   const username = req.username ?? "__anonymous__";
-  const { history, favoriteQueries, savedConnections } = req.body as {
+  const { history, favoriteQueries, savedConnections, language } = req.body as {
     history?: unknown[];
     favoriteQueries?: unknown[];
     savedConnections?: unknown[];
+    language?: 'en' | 'fr';
   };
   const current = loadUserData(username);
   saveUserData(username, {
     history: history ?? current.history,
     favoriteQueries: favoriteQueries ?? current.favoriteQueries,
     savedConnections: savedConnections ?? current.savedConnections,
+    language: language ?? current.language,
   });
   res.json({ ok: true });
 });
@@ -168,7 +170,7 @@ app.post("/api/cert/question", requireAuth, async (req, res) => {
     return;
   }
 
-  const { part, type } = req.body as { part?: number; type?: string };
+  const { part, type, lang } = req.body as { part?: number; type?: string; lang?: string };
 
   const validParts: CertPart[] = [1, 2, 3, 4];
   const validTypes: CertQuestionType[] = ["qcu", "qcm", "practical"];
@@ -183,8 +185,10 @@ app.post("/api/cert/question", requireAuth, async (req, res) => {
       ? (type as CertQuestionType)
       : validTypes[Math.floor(Math.random() * validTypes.length)];
 
+  const resolvedLang = lang === 'fr' ? 'fr' : 'en';
+
   try {
-    const question = await generateCertQuestion(apiKey, resolvedPart, resolvedType);
+    const question = await generateCertQuestion(apiKey, resolvedPart, resolvedType, resolvedLang);
     res.json({ question });
   } catch (err) {
     res.status(500).json({ error: String(err) });
@@ -192,14 +196,16 @@ app.post("/api/cert/question", requireAuth, async (req, res) => {
 });
 
 // POST /api/cert/exam — generates 20 questions for a mock exam (parallel)
-app.post("/api/cert/exam", requireAuth, async (_req, res) => {
+app.post("/api/cert/exam", requireAuth, async (req, res) => {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     res.status(503).json({ error: "AI non configuré (ANTHROPIC_API_KEY manquante)." });
     return;
   }
+  const { lang } = req.body as { lang?: string };
+  const resolvedLang = lang === 'fr' ? 'fr' : 'en';
   try {
-    const questions = await generateExam(apiKey);
+    const questions = await generateExam(apiKey, resolvedLang);
     res.json({ questions });
   } catch (err) {
     res.status(500).json({ error: String(err) });

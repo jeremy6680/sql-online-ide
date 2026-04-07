@@ -24,6 +24,7 @@ export interface UserData {
   history: unknown[];
   favoriteQueries: unknown[];
   savedConnections: unknown[];
+  language?: 'en' | 'fr';
 }
 
 export function loadUserData(username: string): UserData {

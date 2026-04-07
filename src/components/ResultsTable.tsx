@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { QueryResult } from '../types'
 import { ChevronLeft, ChevronRight, Copy } from 'lucide-react'
 
@@ -9,6 +10,7 @@ interface ResultsTableProps {
 }
 
 export function ResultsTable({ result }: ResultsTableProps) {
+  const { t } = useTranslation()
   const [page, setPage] = useState(0)
   const [copied, setCopied] = useState<string | null>(null)
 
@@ -28,7 +30,7 @@ export function ResultsTable({ result }: ResultsTableProps) {
   if (result.error) {
     return (
       <div role="alert" className="p-4 text-red-400 bg-red-900/20 rounded m-2 font-mono text-sm">
-        <span className="font-bold">Error: </span>{result.error}
+        <span className="font-bold">{t('results.error')} </span>{result.error}
       </div>
     )
   }
@@ -36,7 +38,7 @@ export function ResultsTable({ result }: ResultsTableProps) {
   if (!result.columns.length) {
     return (
       <div className="p-4 text-[var(--ide-text-2)] text-sm">
-        Query executed successfully. No rows returned.
+        {t('results.empty')}
         {result.executionTime > 0 && (
           <span className="ml-2 text-[var(--ide-text-3)]">({result.executionTime.toFixed(2)}ms)</span>
         )}
@@ -48,10 +50,10 @@ export function ResultsTable({ result }: ResultsTableProps) {
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--ide-surface2)] border-b border-[var(--ide-border)] text-xs text-[var(--ide-text-2)]">
         <span>
-          {result.rowCount} row{result.rowCount !== 1 ? 's' : ''} · {result.columns.length} col{result.columns.length !== 1 ? 's' : ''} · {result.executionTime.toFixed(2)}ms
+          {t('results.rowCount', { count: result.rowCount })} · {t('results.colCount', { count: result.columns.length })} · {result.executionTime.toFixed(2)}ms
           {result.statementTotal && result.statementTotal > 1 && (
             <span className="ml-2 text-[var(--ide-text-3)]">
-              · statement {result.statementIndex}/{result.statementTotal}
+              · {t('results.statement', { index: result.statementIndex, total: result.statementTotal })}
             </span>
           )}
         </span>
@@ -64,7 +66,7 @@ export function ResultsTable({ result }: ResultsTableProps) {
             >
               <ChevronLeft size={14} />
             </button>
-            <span>Page {page + 1} / {pageCount}</span>
+            <span>{t('results.page', { page: page + 1, total: pageCount })}</span>
             <button
               onClick={() => setPage(p => Math.min(pageCount - 1, p + 1))}
               disabled={page >= pageCount - 1}

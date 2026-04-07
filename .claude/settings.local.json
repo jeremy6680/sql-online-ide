@@ -18,7 +18,8 @@
       "Bash(grep -n \"export function get.*Columns\\\\|export async function get.*Columns\" /Users/jeremymarchandeau/Code/personal/projects/sql-online-ide/src/engines/*.ts /Users/jeremymarchandeau/Code/personal/projects/sql-online-ide/src/engines/*.tsx)",
       "Bash(grep -n \"export.*Columns\" /Users/jeremymarchandeau/Code/personal/projects/sql-online-ide/src/engines/*.ts)",
       "Skill(commit-commands:commit)",
-      "Skill(commit-commands:commit:*)"
+      "Skill(commit-commands:commit:*)",
+      "Bash(find /Users/jeremymarchandeau/Code/personal/projects/sql-online-ide/src -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) -exec grep -l \"Keyboard\\\\|Sign in\\\\|Invalid\\\\|credentials\" {} \\\\;)"
     ]
   }
 }
