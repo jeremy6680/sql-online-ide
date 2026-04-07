@@ -1,18 +1,24 @@
 // src/components/AIHelpPanel.tsx
 //
 // AI SQL assistant panel — lets the user describe what they want in plain
-// language and translates it into a SQL query using the server-side Claude API.
+// language and translates it into a SQL query using the server-side AI API.
 //
-// The panel fetches column schemas on mount so it can send the full schema
-// context to the AI endpoint.
+// Supports Anthropic (Claude) and OpenAI (GPT) providers.
+// The active provider and model are stored in Zustand and persisted.
 
 import { useState, useEffect, useRef } from "react";
-import { Sparkles, Copy, Play, Loader2, AlertCircle } from "lucide-react";
+import { Sparkles, Copy, Play, Loader2, AlertCircle, KeyRound, ChevronDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { DbEngine, RemoteConnection, TableInfo, ColumnInfo } from "../types";
 import { getSQLiteColumns } from "../engines/sqlite";
 import { getDuckDBColumns } from "../engines/duckdb";
 import { getRemoteColumns } from "../engines/remote";
+import {
+  useStore,
+  ANTHROPIC_MODELS,
+  OPENAI_MODELS,
+  type AiProvider,
+} from "../store";
 
 interface Props {
   engine: DbEngine;
@@ -20,6 +26,7 @@ interface Props {
   remoteConnection: RemoteConnection | null;
   token: string | null;
   onUseQuery: (sql: string) => void;
+  onOpenApiKeySettings: () => void;
 }
 
 interface TableSchema {
@@ -51,8 +58,17 @@ async function fetchSchema(
   );
 }
 
-export function AIHelpPanel({ engine, tables, remoteConnection, token, onUseQuery }: Props) {
+export function AIHelpPanel({
+  engine,
+  tables,
+  remoteConnection,
+  token,
+  onUseQuery,
+  onOpenApiKeySettings,
+}: Props) {
   const { t } = useTranslation();
+  const { aiProvider, setAiProvider, aiModel, setAiModel, aiKeyPresence } = useStore();
+
   const [prompt, setPrompt] = useState("");
   const [generatedSQL, setGeneratedSQL] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -60,6 +76,21 @@ export function AIHelpPanel({ engine, tables, remoteConnection, token, onUseQuer
   const [copied, setCopied] = useState(false);
   const [schema, setSchema] = useState<TableSchema[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const models = aiProvider === "openai" ? OPENAI_MODELS : ANTHROPIC_MODELS;
+  const hasKey = aiKeyPresence[aiProvider];
+
+  // When switching provider, reset model to that provider's default
+  function handleProviderChange(p: AiProvider) {
+    setAiProvider(p);
+    if (p === "openai") {
+      setAiModel(OPENAI_MODELS[0].id);
+    } else {
+      setAiModel(ANTHROPIC_MODELS[0].id);
+    }
+    setGeneratedSQL("");
+    setError(null);
+  }
 
   // Load schema when tables change
   useEffect(() => {
@@ -86,6 +117,8 @@ export function AIHelpPanel({ engine, tables, remoteConnection, token, onUseQuer
         body: JSON.stringify({
           prompt,
           engine,
+          provider: aiProvider,
+          model: aiModel,
           tables: schema.map((t) => ({
             name: t.name,
             columns: t.columns.map((c) => ({ name: c.name, type: c.type })),
@@ -120,22 +153,67 @@ export function AIHelpPanel({ engine, tables, remoteConnection, token, onUseQuer
         style={{ background: "var(--ide-surface)" }}
       >
         <Sparkles size={13} className="text-purple-400" aria-hidden="true" />
-        <span className="text-xs font-medium text-[var(--ide-text)]">{t('ai.title')}</span>
+        <span className="text-xs font-medium text-[var(--ide-text)]">{t("ai.title")}</span>
         {tables.length > 0 && (
           <span className="ml-auto text-[10px] text-[var(--ide-text-4)]">
-            {t('ai.context', { count: tables.length })}
+            {t("ai.context", { count: tables.length })}
           </span>
         )}
       </div>
 
       <div className="flex flex-col gap-3 p-3 flex-1 overflow-y-auto">
+        {/* Provider + Model selector */}
+        <div className="flex gap-2">
+          {/* Provider */}
+          <div className="relative flex-1">
+            <select
+              value={aiProvider}
+              onChange={(e) => handleProviderChange(e.target.value as AiProvider)}
+              className="w-full appearance-none bg-[var(--ide-bg)] border border-[var(--ide-border)] rounded-lg px-2 pr-6 py-1.5 text-xs text-[var(--ide-text)] focus:outline-none focus:border-purple-500 transition-colors cursor-pointer"
+              aria-label="AI provider"
+            >
+              <option value="anthropic">Claude (Anthropic)</option>
+              <option value="openai">GPT (OpenAI)</option>
+            </select>
+            <ChevronDown size={10} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--ide-text-4)] pointer-events-none" />
+          </div>
+
+          {/* Model */}
+          <div className="relative flex-1">
+            <select
+              value={aiModel}
+              onChange={(e) => setAiModel(e.target.value)}
+              className="w-full appearance-none bg-[var(--ide-bg)] border border-[var(--ide-border)] rounded-lg px-2 pr-6 py-1.5 text-xs text-[var(--ide-text)] focus:outline-none focus:border-purple-500 transition-colors cursor-pointer"
+              aria-label="AI model"
+            >
+              {models.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={10} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--ide-text-4)] pointer-events-none" />
+          </div>
+        </div>
+
+        {/* No key warning */}
+        {!hasKey && (
+          <button
+            onClick={onOpenApiKeySettings}
+            className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400 hover:bg-amber-500/20 transition-colors text-left"
+          >
+            <KeyRound size={12} className="shrink-0" />
+            <span>
+              No {aiProvider === "openai" ? "OpenAI" : "Anthropic"} key configured.{" "}
+              <span className="underline">Add your API key →</span>
+            </span>
+          </button>
+        )}
+
         {/* Prompt input */}
         <div className="flex flex-col gap-1.5">
-          <label
-            htmlFor="ai-prompt"
-            className="text-xs text-[var(--ide-text-3)]"
-          >
-            {t('ai.label')}
+          <label htmlFor="ai-prompt" className="text-xs text-[var(--ide-text-3)]">
+            {t("ai.label")}
           </label>
           <textarea
             id="ai-prompt"
@@ -146,13 +224,13 @@ export function AIHelpPanel({ engine, tables, remoteConnection, token, onUseQuer
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleGenerate();
             }}
             rows={4}
-            placeholder={t('ai.placeholder')}
+            placeholder={t("ai.placeholder")}
             className="w-full resize-none rounded-lg border border-[var(--ide-border)] bg-[var(--ide-bg)] px-3 py-2 text-xs text-[var(--ide-text)] placeholder:text-[var(--ide-text-4)] focus:outline-none focus:border-purple-500 transition-colors"
           />
           <button
             onClick={handleGenerate}
             disabled={isLoading || !prompt.trim()}
-            aria-label={t('ai.generate')}
+            aria-label={t("ai.generate")}
             className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 rounded-lg text-xs font-medium text-white transition-colors"
           >
             {isLoading ? (
@@ -160,9 +238,11 @@ export function AIHelpPanel({ engine, tables, remoteConnection, token, onUseQuer
             ) : (
               <Sparkles size={12} aria-hidden="true" />
             )}
-            {isLoading ? t('ai.generating') : t('ai.generate')}
+            {isLoading ? t("ai.generating") : t("ai.generate")}
             {!isLoading && (
-              <span className="opacity-60 ml-0.5" aria-hidden="true">⌘↵</span>
+              <span className="opacity-60 ml-0.5" aria-hidden="true">
+                ⌘↵
+              </span>
             )}
           </button>
         </div>
@@ -174,44 +254,52 @@ export function AIHelpPanel({ engine, tables, remoteConnection, token, onUseQuer
             className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-red-400"
           >
             <AlertCircle size={12} className="mt-0.5 shrink-0" aria-hidden="true" />
-            {error}
+            <span>
+              {error}
+              {error.includes("API key") && (
+                <button
+                  onClick={onOpenApiKeySettings}
+                  className="ml-1 underline hover:no-underline"
+                >
+                  Configure keys →
+                </button>
+              )}
+            </span>
           </div>
         )}
 
         {/* Generated SQL result */}
         {generatedSQL && (
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-[var(--ide-text-3)]">{t('ai.generatedSQL')}</span>
-            <pre
-              className="rounded-lg border border-[var(--ide-border)] bg-[var(--ide-bg)] p-2.5 text-xs text-[var(--ide-text)] overflow-x-auto whitespace-pre-wrap font-mono"
-            >
+            <span className="text-xs text-[var(--ide-text-3)]">{t("ai.generatedSQL")}</span>
+            <pre className="rounded-lg border border-[var(--ide-border)] bg-[var(--ide-bg)] p-2.5 text-xs text-[var(--ide-text)] overflow-x-auto whitespace-pre-wrap font-mono">
               {generatedSQL}
             </pre>
             <div className="flex gap-2">
               <button
                 onClick={() => onUseQuery(generatedSQL)}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-500 rounded-lg text-xs font-medium text-white transition-colors"
-                aria-label={t('ai.useQuery')}
+                aria-label={t("ai.useQuery")}
               >
                 <Play size={11} fill="currentColor" aria-hidden="true" />
-                {t('ai.useQuery')}
+                {t("ai.useQuery")}
               </button>
               <button
                 onClick={handleCopy}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-xs transition-colors"
-                aria-label={t('ai.copy')}
+                aria-label={t("ai.copy")}
               >
                 <Copy size={11} aria-hidden="true" />
-                {copied ? t('ai.copied') : t('ai.copy')}
+                {copied ? t("ai.copied") : t("ai.copy")}
               </button>
             </div>
           </div>
         )}
 
-        {/* Empty state — no tables loaded yet */}
+        {/* Empty state */}
         {tables.length === 0 && (
           <p className="text-xs text-[var(--ide-text-4)] text-center mt-4">
-            {t('ai.noTables')}
+            {t("ai.noTables")}
           </p>
         )}
       </div>
