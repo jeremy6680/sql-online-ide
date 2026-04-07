@@ -1,4 +1,4 @@
-// server/cert.ts — ENI SQL certification question generator
+// server/cert.ts — SQL certification question generator
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { CertPart, CertQuestion, CertQuestionType } from "../src/types.js";
@@ -78,7 +78,6 @@ const PART_CONCEPTS: Record<CertPart, string[]> = {
     "ALTER TABLE DROP COLUMN",
     "ALTER TABLE MODIFY / ALTER COLUMN pour changer le type",
     "DROP TABLE et IF EXISTS",
-    "séquence de transactions : BEGIN, COMMIT, ROLLBACK",
   ],
   4: [
     "CREATE VIEW simple basée sur un SELECT de base",
@@ -125,6 +124,37 @@ const THEMES = [
   "fournisseurs / matériaux / chantiers",
   "animaux / refuges / adoptions",
 ];
+
+// Exam plan: 20 questions distributed across parts and types
+// Mirrors the real ENI exam ratio (~75% QCU/QCM, ~25% practical)
+const EXAM_PLAN: Array<{ part: CertPart; type: CertQuestionType }> = [
+  { part: 1, type: "qcu" },
+  { part: 1, type: "qcu" },
+  { part: 1, type: "qcm" },
+  { part: 1, type: "qcm" },
+  { part: 1, type: "practical" },
+  { part: 2, type: "qcu" },
+  { part: 2, type: "qcu" },
+  { part: 2, type: "qcm" },
+  { part: 2, type: "qcm" },
+  { part: 2, type: "practical" },
+  { part: 3, type: "qcu" },
+  { part: 3, type: "qcu" },
+  { part: 3, type: "qcm" },
+  { part: 3, type: "qcm" },
+  { part: 3, type: "practical" },
+  { part: 4, type: "qcu" },
+  { part: 4, type: "qcu" },
+  { part: 4, type: "qcm" },
+  { part: 4, type: "practical" },
+  { part: 4, type: "practical" },
+];
+
+// Cost estimate based on claude-haiku-4-5 pricing:
+// Input: $0.80/MTok × 20q × ~900 tok ≈ $0.014
+// Output: $4/MTok   × 20q × ~600 tok ≈ $0.048
+// Total: ~$0.06 per exam generation
+export const EXAM_COST_ESTIMATE = { usd: 0.06, eur: 0.055 };
 
 function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -217,4 +247,45 @@ export async function generateCertQuestion(
 
   const parsed = JSON.parse(jsonStr) as Omit<CertQuestion, "id">;
   return { ...parsed, id: crypto.randomUUID() } as CertQuestion;
+}
+
+async function generateCertQuestionWithRetry(
+  apiKey: string,
+  part: CertPart,
+  type: CertQuestionType,
+  maxAttempts = 2,
+): Promise<CertQuestion> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await generateCertQuestion(apiKey, part, type);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr;
+}
+
+export async function generateExam(apiKey: string): Promise<CertQuestion[]> {
+  // Questions follow the defined order: 5×P1, 5×P2, 5×P3, 5×P4
+  // Generate in batches of 5 to stay within the 50 req/min rate limit
+  const BATCH_SIZE = 5;
+  const results: CertQuestion[] = [];
+
+  for (let i = 0; i < EXAM_PLAN.length; i += BATCH_SIZE) {
+    const batch = EXAM_PLAN.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map(({ part, type }) =>
+        generateCertQuestionWithRetry(apiKey, part, type),
+      ),
+    );
+    results.push(...batchResults);
+
+    // Brief pause between batches to stay well under 50 req/min
+    if (i + BATCH_SIZE < EXAM_PLAN.length) {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+  }
+
+  return results;
 }

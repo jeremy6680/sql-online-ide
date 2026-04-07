@@ -27,7 +27,7 @@ import {
   isAuthEnabled,
 } from "./auth.js";
 import { loadUserData, saveUserData } from "./userData.js";
-import { generateCertQuestion } from "./cert.js";
+import { generateCertQuestion, generateExam } from "./cert.js";
 import type { CertPart, CertQuestionType } from "../src/types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -186,6 +186,21 @@ app.post("/api/cert/question", requireAuth, async (req, res) => {
   try {
     const question = await generateCertQuestion(apiKey, resolvedPart, resolvedType);
     res.json({ question });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// POST /api/cert/exam — generates 20 questions for a mock exam (parallel)
+app.post("/api/cert/exam", requireAuth, async (_req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    res.status(503).json({ error: "AI non configuré (ANTHROPIC_API_KEY manquante)." });
+    return;
+  }
+  try {
+    const questions = await generateExam(apiKey);
+    res.json({ questions });
   } catch (err) {
     res.status(500).json({ error: String(err) });
   }

@@ -764,11 +764,11 @@ export default function App() {
           </button>
         )}
 
-        {/* ENI Certification prep — only shown when AI is enabled AND user is logged in */}
+        {/* Test SQL prep — only shown when AI is enabled AND user is logged in */}
         {aiEnabled && auth.token && (
           <button
             onClick={() => setCertPanelOpen(!certPanelOpen)}
-            aria-label={certPanelOpen ? "Fermer la préparation ENI" : "Ouvrir la préparation ENI SQL"}
+            aria-label={certPanelOpen ? "Fermer la préparation Test SQL" : "Ouvrir la préparation Test SQL"}
             aria-pressed={certPanelOpen}
             className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm transition-colors ${
               certPanelOpen
@@ -777,7 +777,7 @@ export default function App() {
             }`}
           >
             <BookOpen size={13} aria-hidden="true" />
-            ENI
+            Test
           </button>
         )}
 
@@ -1202,13 +1202,13 @@ export default function App() {
           </div>
         )}
 
-        {/* ENI Certification Prep Panel */}
+        {/* Test SQL Prep Panel */}
         {certPanelOpen && aiEnabled && (
           <>
             {/* Horizontal resize handle — drag left to widen, right to narrow */}
             <div
               role="separator"
-              aria-label="Redimensionner le panneau ENI"
+              aria-label="Redimensionner le panneau Test SQL"
               aria-orientation="vertical"
               className="w-1.5 shrink-0 cursor-col-resize bg-[var(--ide-border)] hover:bg-blue-500/40 transition-colors active:bg-blue-500/60"
               onMouseDown={(e) => {
@@ -1232,7 +1232,7 @@ export default function App() {
             />
             <div
               role="complementary"
-              aria-label="Préparation certification ENI SQL"
+              aria-label="Préparation Test SQL"
               className="shrink-0 overflow-hidden flex flex-col"
               style={{ width: certPanelWidth }}
             >
