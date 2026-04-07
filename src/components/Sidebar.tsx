@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ChevronRight, ChevronDown, Table2, Eye, Columns, RefreshCw, Trash2, AlertTriangle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { TableInfo, ColumnInfo, DbEngine, RemoteConnection } from '../types'
 import { getSQLiteColumns } from '../engines/sqlite'
 import { getDuckDBColumns } from '../engines/duckdb'
@@ -21,6 +22,7 @@ function TableItem({ table, engine, remoteConnection, onBrowse, onDrop }: {
   onBrowse: (tableName: string) => void
   onDrop: (tableName: string) => void
 }) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const [columns, setColumns] = useState<ColumnInfo[]>([])
   const [loading, setLoading] = useState(false)
@@ -45,20 +47,20 @@ function TableItem({ table, engine, remoteConnection, onBrowse, onDrop }: {
       <div role="alert" className="px-2 py-2 bg-red-900/20 border-l-2 border-red-500">
         <div className="flex items-center gap-1 text-xs text-red-400 mb-2">
           <AlertTriangle size={11} />
-          Drop <span className="font-mono font-bold">{table.name}</span>?
+          {t('sidebar.dropConfirm', { name: table.name })}
         </div>
         <div className="flex gap-1">
           <button
             onClick={() => setConfirmDrop(false)}
             className="flex-1 px-2 py-1 text-xs bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] rounded"
           >
-            Cancel
+            {t('sidebar.cancel')}
           </button>
           <button
             onClick={() => { setConfirmDrop(false); onDrop(table.name) }}
             className="flex-1 px-2 py-1 text-xs bg-red-700 hover:bg-red-600 text-white rounded font-medium"
           >
-            Drop
+            {t('sidebar.drop')}
           </button>
         </div>
       </div>
@@ -70,7 +72,7 @@ function TableItem({ table, engine, remoteConnection, onBrowse, onDrop }: {
       <div
         className="flex items-center gap-1.5 px-2 py-1 hover:bg-[var(--ide-surface2)] cursor-pointer group text-sm"
         onClick={() => onBrowse(table.name)}
-        title="Click to preview data"
+        title={t('sidebar.clickToPreview')}
       >
         <button
           onClick={toggleExpand}
@@ -89,7 +91,7 @@ function TableItem({ table, engine, remoteConnection, onBrowse, onDrop }: {
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
           <button
             onClick={(e) => { e.stopPropagation(); onBrowse(table.name) }}
-            title="Browse data"
+            title={t('sidebar.browseData')}
             className="p-1 rounded hover:bg-[var(--ide-surface3)] text-[var(--ide-text-3)] hover:text-blue-400"
           >
             <Eye size={11} />
@@ -97,7 +99,7 @@ function TableItem({ table, engine, remoteConnection, onBrowse, onDrop }: {
           {table.type === 'table' && (
             <button
               onClick={(e) => { e.stopPropagation(); setConfirmDrop(true) }}
-              title="Drop table"
+              title={t('sidebar.dropTable')}
               className="p-1 rounded hover:bg-red-900/30 text-[var(--ide-text-3)] hover:text-red-400"
             >
               <Trash2 size={11} />
@@ -109,9 +111,9 @@ function TableItem({ table, engine, remoteConnection, onBrowse, onDrop }: {
       {expanded && (
         <div className="ml-5 border-l border-[var(--ide-border)]">
           {loading ? (
-            <div className="px-3 py-1 text-xs text-[var(--ide-text-3)]">Loading...</div>
+            <div className="px-3 py-1 text-xs text-[var(--ide-text-3)]">{t('sidebar.loading')}</div>
           ) : columns.length === 0 ? (
-            <div className="px-3 py-1 text-xs text-[var(--ide-text-3)]">No columns found</div>
+            <div className="px-3 py-1 text-xs text-[var(--ide-text-3)]">{t('sidebar.noColumns')}</div>
           ) : (
             columns.map((col) => (
               <div key={col.name} className="flex items-center gap-1.5 px-2 py-0.5 hover:bg-[var(--ide-surface2)] text-xs">
@@ -129,14 +131,15 @@ function TableItem({ table, engine, remoteConnection, onBrowse, onDrop }: {
 }
 
 export function Sidebar({ tables, engine, remoteConnection, onBrowse, onDrop, onRefresh }: SidebarProps) {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col h-full bg-[var(--ide-surface)] border-r border-[var(--ide-border)]">
       <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--ide-border)]">
-        <span className="text-xs font-semibold text-[var(--ide-text-3)] uppercase tracking-wider">Tables</span>
+        <span className="text-xs font-semibold text-[var(--ide-text-3)] uppercase tracking-wider">{t('sidebar.tables')}</span>
         <button
           onClick={onRefresh}
           className="p-1 hover:text-[var(--ide-text)] text-[var(--ide-text-3)] hover:bg-[var(--ide-surface2)] rounded"
-          title="Refresh"
+          title={t('sidebar.refresh')}
         >
           <RefreshCw size={12} />
         </button>
@@ -144,13 +147,13 @@ export function Sidebar({ tables, engine, remoteConnection, onBrowse, onDrop, on
       <div className="flex-1 overflow-y-auto">
         {tables.length === 0 ? (
           <div className="p-3 text-xs text-[var(--ide-text-4)]">
-            No tables found.<br />Run a CREATE TABLE statement to get started.
+            {t('sidebar.noTables')}<br />{t('sidebar.noTablesHint')}
           </div>
         ) : (
-          tables.map((t) => (
+          tables.map((tbl) => (
             <TableItem
-              key={t.name}
-              table={t}
+              key={tbl.name}
+              table={tbl}
               engine={engine}
               remoteConnection={remoteConnection}
               onBrowse={onBrowse}

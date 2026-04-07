@@ -66,6 +66,10 @@ interface AppState {
   theme: 'dark' | 'light'
   toggleTheme: () => void
 
+  // Language
+  language: 'en' | 'fr'
+  setLanguage: (lang: 'en' | 'fr') => void
+
   // Query tabs
   tabs: QueryTab[]
   activeTabId: string
@@ -133,6 +137,9 @@ export const useStore = create<AppState>()(
       theme: 'dark',
       toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
 
+      language: 'en',
+      setLanguage: (language) => set({ language }),
+
       tabs: [{ id: 'tab-1', name: 'Query 1', sql: '', engine: 'sqlite' }],
       activeTabId: 'tab-1',
       addTab: () => set((state) => {
@@ -173,6 +180,7 @@ export const useStore = create<AppState>()(
         favoriteQueries: state.favoriteQueries,
         savedConnections: state.savedConnections,
         theme: state.theme,
+        language: state.language,
         tabs: state.tabs,
         activeTabId: state.activeTabId,
       }),

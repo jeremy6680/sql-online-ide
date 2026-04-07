@@ -3,15 +3,18 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { CertPart, CertQuestion, CertQuestionType } from "../src/types.js";
 
-const PART_DESCRIPTIONS: Record<CertPart, string> = {
+type Lang = 'en' | 'fr';
+
+// ── French content ────────────────────────────────────────────────────────────
+
+const PART_DESCRIPTIONS_FR: Record<CertPart, string> = {
   1: "Requêtes simples : SELECT, FROM, WHERE (AND/OR/NOT/IN/BETWEEN/LIKE/IS NULL), ORDER BY, LIMIT, GROUP BY, HAVING, fonctions d'agrégation (COUNT, SUM, AVG, MIN, MAX), DISTINCT, alias (AS), fonctions scalaires (UPPER, LOWER, LENGTH, CONCAT, ROUND, YEAR, MONTH…).",
   2: "Requêtes complexes : INNER JOIN, LEFT JOIN, RIGHT JOIN, jointures multiples (3+ tables), auto-jointure, sous-requêtes simples et corrélées (IN, NOT IN, EXISTS, NOT EXISTS, sous-requête scalaire), CTE (WITH … AS) simples et imbriquées, UNION, UNION ALL, INTERSECT, EXCEPT.",
   3: "Mise à jour des données : INSERT INTO … VALUES, INSERT INTO … SELECT, UPDATE … SET … WHERE, DELETE FROM … WHERE, TRUNCATE TABLE, CREATE TABLE avec contraintes (PRIMARY KEY, NOT NULL, UNIQUE, DEFAULT), CREATE TABLE … AS SELECT, CREATE TEMPORARY TABLE, ALTER TABLE (ADD/DROP/MODIFY COLUMN), DROP TABLE.",
   4: "Enregistrement de vues : CREATE VIEW … AS SELECT, CREATE OR REPLACE VIEW, vues avec jointures, vues avec agrégations et GROUP BY, vues avec sous-requêtes ou CTE, utilisation d'une vue dans une autre requête, DROP VIEW, notion de vue modifiable.",
 };
 
-// Fine-grained SQL concepts per part — one is randomly picked to focus each question
-const PART_CONCEPTS: Record<CertPart, string[]> = {
+const PART_CONCEPTS_FR: Record<CertPart, string[]> = {
   1: [
     "SELECT de base et projection de colonnes",
     "DISTINCT pour éliminer les doublons",
@@ -95,8 +98,7 @@ const PART_CONCEPTS: Record<CertPart, string[]> = {
   ],
 };
 
-// Question styles for QCU/QCM — adds variety beyond just "what is the output"
-const QCU_QCM_STYLES = [
+const QCU_QCM_STYLES_FR = [
   "Quelle est la sortie (résultat) de cette requête SQL ?",
   "Laquelle de ces requêtes SQL est syntaxiquement correcte et produit le résultat attendu ?",
   "Laquelle de ces requêtes contient une erreur (syntaxe ou logique) ?",
@@ -107,7 +109,7 @@ const QCU_QCM_STYLES = [
   "Quel est l'effet de l'ajout / de la suppression de cette clause sur le résultat ?",
 ];
 
-const THEMES = [
+const THEMES_FR = [
   "employés / services / salaires",
   "produits / commandes / clients",
   "étudiants / cours / inscriptions",
@@ -124,6 +126,130 @@ const THEMES = [
   "fournisseurs / matériaux / chantiers",
   "animaux / refuges / adoptions",
 ];
+
+// ── English content ───────────────────────────────────────────────────────────
+
+const PART_DESCRIPTIONS_EN: Record<CertPart, string> = {
+  1: "Simple queries: SELECT, FROM, WHERE (AND/OR/NOT/IN/BETWEEN/LIKE/IS NULL), ORDER BY, LIMIT, GROUP BY, HAVING, aggregate functions (COUNT, SUM, AVG, MIN, MAX), DISTINCT, aliases (AS), scalar functions (UPPER, LOWER, LENGTH, CONCAT, ROUND, YEAR, MONTH…).",
+  2: "Complex queries: INNER JOIN, LEFT JOIN, RIGHT JOIN, multi-table joins (3+ tables), self-join, simple and correlated subqueries (IN, NOT IN, EXISTS, NOT EXISTS, scalar subquery), simple and nested CTEs (WITH … AS), UNION, UNION ALL, INTERSECT, EXCEPT.",
+  3: "Data modification: INSERT INTO … VALUES, INSERT INTO … SELECT, UPDATE … SET … WHERE, DELETE FROM … WHERE, TRUNCATE TABLE, CREATE TABLE with constraints (PRIMARY KEY, NOT NULL, UNIQUE, DEFAULT), CREATE TABLE … AS SELECT, CREATE TEMPORARY TABLE, ALTER TABLE (ADD/DROP/MODIFY COLUMN), DROP TABLE.",
+  4: "Views: CREATE VIEW … AS SELECT, CREATE OR REPLACE VIEW, views with joins, views with aggregations and GROUP BY, views with subqueries or CTEs, using a view inside another query, DROP VIEW, updatable views.",
+};
+
+const PART_CONCEPTS_EN: Record<CertPart, string[]> = {
+  1: [
+    "Basic SELECT and column projection",
+    "DISTINCT to eliminate duplicates",
+    "WHERE filtering with comparison operators (=, <>, <, >, <=, >=)",
+    "WHERE filtering with IN and NOT IN",
+    "WHERE filtering with BETWEEN … AND",
+    "WHERE filtering with LIKE and wildcards (%, _)",
+    "WHERE filtering with IS NULL / IS NOT NULL",
+    "Combining conditions with AND, OR, NOT",
+    "ORDER BY with multiple columns and ASC/DESC direction",
+    "LIMIT (or TOP depending on the DBMS)",
+    "GROUP BY on one or more columns",
+    "HAVING to filter groups after aggregation",
+    "COUNT(*) and COUNT(column)",
+    "SUM and AVG on a numeric column",
+    "MIN and MAX",
+    "Column aliases with AS",
+    "Table aliases and column qualification (table.column)",
+    "Arithmetic expressions in SELECT (+, -, *, /)",
+    "String functions: UPPER, LOWER, LENGTH, TRIM, CONCAT / ||",
+    "Numeric functions: ROUND, FLOOR, CEIL, ABS",
+    "Date functions: YEAR, MONTH, DAY, DATE_DIFF, NOW / CURRENT_DATE",
+    "CASE … WHEN … THEN … ELSE … END in SELECT",
+    "COALESCE to replace NULL values",
+  ],
+  2: [
+    "INNER JOIN between two tables",
+    "LEFT JOIN and NULL values in the right table",
+    "RIGHT JOIN",
+    "FULL OUTER JOIN (or UNION of LEFT and RIGHT JOIN equivalent)",
+    "Joining three or more tables (chained JOINs)",
+    "Self-join on the same table",
+    "Subquery in WHERE with IN",
+    "Subquery in WHERE with NOT IN",
+    "Subquery in WHERE with EXISTS",
+    "Subquery in WHERE with NOT EXISTS",
+    "Correlated subquery (referencing the outer table)",
+    "Scalar subquery used in SELECT or as a value",
+    "Simple CTE (WITH name AS (…) SELECT …)",
+    "CTE used in a join",
+    "Multiple CTEs in one query (WITH a AS (…), b AS (…))",
+    "Recursive CTE (WITH RECURSIVE … UNION ALL)",
+    "UNION to combine two results without duplicates",
+    "UNION ALL to keep duplicates",
+    "INTERSECT for the intersection of two results",
+    "EXCEPT (or MINUS) for the difference between two results",
+  ],
+  3: [
+    "INSERT INTO … VALUES to insert a single row",
+    "INSERT INTO … VALUES to insert multiple rows at once",
+    "INSERT INTO … SELECT to copy data from another table",
+    "UPDATE … SET … WHERE to modify targeted rows",
+    "UPDATE modifying multiple columns at once",
+    "UPDATE with a subquery in SET or WHERE",
+    "DELETE FROM … WHERE to delete targeted rows",
+    "DELETE with a subquery in WHERE",
+    "TRUNCATE TABLE and difference from DELETE without WHERE",
+    "CREATE TABLE with PRIMARY KEY",
+    "CREATE TABLE with NOT NULL and DEFAULT",
+    "CREATE TABLE with UNIQUE and CHECK",
+    "CREATE TABLE … AS SELECT to create a table from a query",
+    "CREATE TEMPORARY TABLE",
+    "ALTER TABLE ADD COLUMN",
+    "ALTER TABLE DROP COLUMN",
+    "ALTER TABLE MODIFY / ALTER COLUMN to change the type",
+    "DROP TABLE and IF EXISTS",
+  ],
+  4: [
+    "Simple CREATE VIEW based on a basic SELECT",
+    "CREATE VIEW with a join between two tables",
+    "CREATE VIEW with aggregation and GROUP BY",
+    "CREATE VIEW with a WHERE filter",
+    "CREATE VIEW incorporating a subquery",
+    "CREATE VIEW based on a CTE (WITH … AS)",
+    "CREATE OR REPLACE VIEW to replace an existing view",
+    "Using a view in a SELECT query",
+    "Joining a view with a table",
+    "DROP VIEW and DROP VIEW IF EXISTS",
+    "Updatable view concept (view on a single table without GROUP BY or DISTINCT)",
+    "View with column aliases",
+  ],
+};
+
+const QCU_QCM_STYLES_EN = [
+  "What is the output (result) of this SQL query?",
+  "Which of these SQL queries is syntactically correct and produces the expected result?",
+  "Which of these queries contains an error (syntax or logic)?",
+  "Which SQL query allows you to obtain the described result?",
+  "What exactly does this clause / this part of the query do?",
+  "Among these queries, which one is equivalent to the given query?",
+  "In what order must the clauses be written for the query to be valid?",
+  "What is the effect of adding / removing this clause on the result?",
+];
+
+const THEMES_EN = [
+  "employees / departments / salaries",
+  "products / orders / customers",
+  "students / courses / enrollments",
+  "books / authors / libraries",
+  "doctors / patients / consultations",
+  "movies / actors / directors",
+  "flights / passengers / airports",
+  "projects / developers / teams",
+  "restaurants / menus / reservations",
+  "real estate / apartments / owners",
+  "events / participants / tickets",
+  "sports teams / matches / scores",
+  "banks / bank accounts / transactions",
+  "suppliers / materials / construction sites",
+  "animals / shelters / adoptions",
+];
+
+// ── Exam plan ─────────────────────────────────────────────────────────────────
 
 // Exam plan: 20 questions distributed across parts and types
 // Mirrors the real ENI exam ratio (~75% QCU/QCM, ~25% practical)
@@ -160,9 +286,16 @@ function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function buildSystemPrompt(part: CertPart, type: CertQuestionType): string {
-  const theme = pickRandom(THEMES);
-  const concept = pickRandom(PART_CONCEPTS[part]);
+function buildSystemPrompt(part: CertPart, type: CertQuestionType, lang: Lang): string {
+  if (lang === 'fr') {
+    return buildSystemPromptFR(part, type);
+  }
+  return buildSystemPromptEN(part, type);
+}
+
+function buildSystemPromptFR(part: CertPart, type: CertQuestionType): string {
+  const theme = pickRandom(THEMES_FR);
+  const concept = pickRandom(PART_CONCEPTS_FR[part]);
   const typeLabel =
     type === "qcu"
       ? "QCU (une seule bonne réponse, boutons ronds)"
@@ -172,12 +305,12 @@ function buildSystemPrompt(part: CertPart, type: CertQuestionType): string {
 
   const styleHint =
     type !== "practical"
-      ? `\nSTYLE DE LA QUESTION : ${pickRandom(QCU_QCM_STYLES)}`
+      ? `\nSTYLE DE LA QUESTION : ${pickRandom(QCU_QCM_STYLES_FR)}`
       : "";
 
   return `Tu es un générateur de questions pour l'examen de certification ENI SQL.
 
-PARTIE CONCERNÉE : Partie ${part} — ${PART_DESCRIPTIONS[part]}
+PARTIE CONCERNÉE : Partie ${part} — ${PART_DESCRIPTIONS_FR[part]}
 TYPE DE QUESTION : ${typeLabel}${styleHint}
 THÈME DES DONNÉES : ${theme}
 CONCEPT SQL CIBLÉ : ${concept}
@@ -222,18 +355,83 @@ RÈGLES IMPORTANTES :
 - Retourne UNIQUEMENT le JSON, sans aucun texte autour.`;
 }
 
+function buildSystemPromptEN(part: CertPart, type: CertQuestionType): string {
+  const theme = pickRandom(THEMES_EN);
+  const concept = pickRandom(PART_CONCEPTS_EN[part]);
+  const typeLabel =
+    type === "qcu"
+      ? "MCQ – single correct answer (radio buttons)"
+      : type === "qcm"
+        ? "MCQ – multiple correct answers possible (checkboxes)"
+        : "Practical case (the user writes a SQL query)";
+
+  const styleHint =
+    type !== "practical"
+      ? `\nQUESTION STYLE: ${pickRandom(QCU_QCM_STYLES_EN)}`
+      : "";
+
+  return `You are a question generator for the ENI SQL certification exam.
+
+PART: Part ${part} — ${PART_DESCRIPTIONS_EN[part]}
+QUESTION TYPE: ${typeLabel}${styleHint}
+DATA THEME: ${theme}
+TARGET SQL CONCEPT: ${concept}
+
+The question MUST focus specifically on the targeted concept. Do not use a different concept even if it is simpler. The data theme serves only as narrative context.
+
+Generate EXACTLY ONE exam question as strict JSON, without markdown, without comments.
+The JSON must follow EXACTLY this schema depending on the type:
+
+For MCQ (single or multiple):
+{
+  "part": ${part},
+  "type": "${type}",
+  "context": "<optional context paragraph describing the schema or scenario, or empty string>",
+  "questionText": "<question text>",
+  "choices": [
+    { "label": "A", "text": "<choice A — may contain SQL on multiple lines>" },
+    { "label": "B", "text": "<choice B>" },
+    { "label": "C", "text": "<choice C>" },
+    { "label": "D", "text": "<choice D>" }
+  ],
+  "correctAnswers": ["B"],
+  "explanation": "<educational explanation of the correct answer>"
+}
+
+For a practical case:
+{
+  "part": ${part},
+  "type": "practical",
+  "context": "<context describing the scenario>",
+  "questionText": "<precise instruction of what the user must write>",
+  "schemaSQL": "<CREATE TABLE and INSERT INTO statements for 2-3 tables with 5-10 rows each, without FOREIGN KEY constraints>",
+  "correctSQL": "<correct and complete SQL query>",
+  "explanation": "<educational explanation of the solution>"
+}
+
+IMPORTANT RULES:
+- Data must be anonymous (fictional names) and varied.
+- For MCQ on SQL code: incorrect choices must represent common and plausible mistakes (do not include obviously wrong choices).
+- For practical cases: schemaSQL must NOT contain FOREIGN KEY or ALTER TABLE; use only CREATE TABLE + INSERT INTO.
+- correctAnswers for single MCQ: exactly one label. For multiple MCQ: two or three labels.
+- Return ONLY the JSON, with no surrounding text.`;
+}
+
 export async function generateCertQuestion(
   apiKey: string,
   part: CertPart,
   type: CertQuestionType,
+  lang: Lang = 'fr',
 ): Promise<CertQuestion> {
   const client = new Anthropic({ apiKey });
+
+  const userMessage = lang === 'fr' ? "Génère la question." : "Generate the question.";
 
   const message = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 2048,
-    system: buildSystemPrompt(part, type),
-    messages: [{ role: "user", content: "Génère la question." }],
+    system: buildSystemPrompt(part, type, lang),
+    messages: [{ role: "user", content: userMessage }],
   });
 
   const raw = message.content
@@ -253,12 +451,13 @@ async function generateCertQuestionWithRetry(
   apiKey: string,
   part: CertPart,
   type: CertQuestionType,
+  lang: Lang,
   maxAttempts = 2,
 ): Promise<CertQuestion> {
   let lastErr: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await generateCertQuestion(apiKey, part, type);
+      return await generateCertQuestion(apiKey, part, type, lang);
     } catch (err) {
       lastErr = err;
     }
@@ -266,7 +465,7 @@ async function generateCertQuestionWithRetry(
   throw lastErr;
 }
 
-export async function generateExam(apiKey: string): Promise<CertQuestion[]> {
+export async function generateExam(apiKey: string, lang: Lang = 'fr'): Promise<CertQuestion[]> {
   // Questions follow the defined order: 5×P1, 5×P2, 5×P3, 5×P4
   // Generate in batches of 5 to stay within the 50 req/min rate limit
   const BATCH_SIZE = 5;
@@ -276,7 +475,7 @@ export async function generateExam(apiKey: string): Promise<CertQuestion[]> {
     const batch = EXAM_PLAN.slice(i, i + BATCH_SIZE);
     const batchResults = await Promise.all(
       batch.map(({ part, type }) =>
-        generateCertQuestionWithRetry(apiKey, part, type),
+        generateCertQuestionWithRetry(apiKey, part, type, lang),
       ),
     );
     results.push(...batchResults);

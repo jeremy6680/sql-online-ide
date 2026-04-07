@@ -41,6 +41,8 @@ import { CertPanel } from "./components/CertPanel";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 
 import { useStore } from "./store";
+import { useTranslation } from "react-i18next";
+import i18n from "./i18n";
 import {
   initSQLite,
   runSQLiteQuery,
@@ -117,7 +119,11 @@ export default function App() {
     updateTabEngine,
     certPanelOpen,
     setCertPanelOpen,
+    language,
+    setLanguage,
   } = useStore();
+
+  const { t } = useTranslation();
 
   const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[0];
 
@@ -136,6 +142,7 @@ export default function App() {
   const [aiEnabled, setAIEnabled] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showEngineMenu, setShowEngineMenu] = useState(false);
   const [certPanelWidth, setCertPanelWidth] = useState(384);
   const [schemaMap, setSchemaMap] = useState<Record<string, string[]>>({});
   const [shareCopied, setShareCopied] = useState(false);
@@ -160,14 +167,18 @@ export default function App() {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => res.json())
-        .then((data: { history?: HistoryEntry[]; favoriteQueries?: FavoriteQuery[]; savedConnections?: SavedConnection[] }) => {
+        .then((data: { history?: HistoryEntry[]; favoriteQueries?: FavoriteQuery[]; savedConnections?: SavedConnection[]; language?: 'en' | 'fr' }) => {
           if (Array.isArray(data.history)) setHistory(data.history);
           if (Array.isArray(data.favoriteQueries)) setFavoriteQueries(data.favoriteQueries);
           if (Array.isArray(data.savedConnections)) setSavedConnections(data.savedConnections);
+          if (data.language === 'en' || data.language === 'fr') {
+            setLanguage(data.language);
+            i18n.changeLanguage(data.language);
+          }
         })
         .catch(() => {});
     },
-    [setHistory, setFavoriteQueries, setSavedConnections],
+    [setHistory, setFavoriteQueries, setSavedConnections, setLanguage],
   );
 
   const saveServerUserData = useCallback(
@@ -178,10 +189,10 @@ export default function App() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ history, favoriteQueries, savedConnections }),
+        body: JSON.stringify({ history, favoriteQueries, savedConnections, language }),
       }).catch(() => {});
     },
-    [history, favoriteQueries, savedConnections],
+    [history, favoriteQueries, savedConnections, language],
   );
 
   // Load server data whenever the user logs in (token goes from null → value)
@@ -195,12 +206,17 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.token]);
 
-  // Auto-save to server whenever history or favorites change (debounced)
+  // Auto-save to server whenever history, favorites, or language change (debounced)
   useEffect(() => {
     if (!auth.token) return;
     const id = setTimeout(() => saveServerUserData(auth.token!), 800);
     return () => clearTimeout(id);
-  }, [auth.token, history, favoriteQueries, savedConnections, saveServerUserData]);
+  }, [auth.token, history, favoriteQueries, savedConnections, language, saveServerUserData]);
+
+  // Sync i18n instance when language changes (covers guests relying on localStorage only)
+  useEffect(() => {
+    i18n.changeLanguage(language);
+  }, [language]);
 
   // On load: verify stored token is still valid; detect if auth is enabled; check AI status
   useEffect(() => {
@@ -534,33 +550,51 @@ export default function App() {
           </span>
         </div>
 
-        {/* Engine Selector */}
-        <div
-          role="group"
-          aria-label="Database engine"
-          className="flex items-center gap-1 rounded-lg p-0.5 border border-[var(--ide-border)]"
-          style={{ background: "var(--ide-bg)" }}
-        >
-          {(Object.keys(ENGINE_LABELS) as DbEngine[]).map((e) => (
-            <button
-              key={e}
-              onClick={() => handleEngineChange(e)}
-              aria-pressed={engine === e}
-              aria-label={`Switch to ${ENGINE_LABELS[e].label}${ENGINE_LABELS[e].wasm ? " (runs in browser)" : ""}`}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                engine === e
-                  ? `${ENGINE_LABELS[e].color} text-white shadow`
-                  : "text-[var(--ide-text-2)] hover:text-[var(--ide-text)] hover:bg-[var(--ide-surface2)]"
-              }`}
+        {/* Engine Selector — compact dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowEngineMenu(v => !v)}
+            aria-haspopup="listbox"
+            aria-expanded={showEngineMenu}
+            aria-label={`Database engine: ${ENGINE_LABELS[engine].label}`}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--ide-bg)] border border-[var(--ide-border)] rounded-lg text-xs font-medium hover:bg-[var(--ide-surface2)] transition-colors"
+          >
+            <span className={`w-2 h-2 rounded-full shrink-0 ${ENGINE_LABELS[engine].color}`} aria-hidden="true" />
+            {ENGINE_LABELS[engine].label}
+            {ENGINE_LABELS[engine].wasm && (
+              <span className="text-[9px] opacity-50" aria-hidden="true">WASM</span>
+            )}
+            <ChevronDown size={10} aria-hidden="true" />
+          </button>
+          {showEngineMenu && (
+            <div
+              role="listbox"
+              aria-label="Database engine"
+              className="absolute left-0 top-full mt-1 z-50 w-44 bg-[var(--ide-surface)] border border-[var(--ide-border)] rounded-lg shadow-xl py-1 text-sm"
+              onMouseLeave={() => setShowEngineMenu(false)}
             >
-              {ENGINE_LABELS[e].label}
-              {ENGINE_LABELS[e].wasm && (
-                <span className="ml-1 text-[9px] opacity-60" aria-hidden="true">
-                  WASM
-                </span>
-              )}
-            </button>
-          ))}
+              {(Object.keys(ENGINE_LABELS) as DbEngine[]).map((e) => (
+                <button
+                  key={e}
+                  role="option"
+                  aria-selected={engine === e}
+                  onClick={() => { handleEngineChange(e); setShowEngineMenu(false); }}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--ide-surface2)] text-left transition-colors ${
+                    engine === e ? "text-[var(--ide-text)]" : "text-[var(--ide-text-2)]"
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${ENGINE_LABELS[e].color}`} aria-hidden="true" />
+                  {ENGINE_LABELS[e].label}
+                  {ENGINE_LABELS[e].wasm && (
+                    <span className="text-[9px] text-[var(--ide-text-4)] ml-1" aria-hidden="true">WASM</span>
+                  )}
+                  {engine === e && (
+                    <Check size={11} className="ml-auto text-[var(--ide-text-3)] shrink-0" aria-hidden="true" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex-1" />
@@ -574,7 +608,7 @@ export default function App() {
           className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors text-white"
         >
           <Play size={13} fill="currentColor" aria-hidden="true" />
-          Run
+          {t('toolbar.run')}
           <span className="text-xs opacity-60 ml-0.5" aria-hidden="true">⌘↵</span>
         </button>
 
@@ -588,7 +622,7 @@ export default function App() {
             className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors"
           >
             <Upload size={13} aria-hidden="true" />
-            Import
+            {t('toolbar.import')}
             <ChevronDown size={11} aria-hidden="true" />
           </button>
           {showImportMenu && (
@@ -602,7 +636,7 @@ export default function App() {
               >
                 <Upload size={12} aria-hidden="true" />
                 <div>
-                  <div className="text-[var(--ide-text)]">SQLite / SQL file</div>
+                  <div className="text-[var(--ide-text)]">{t('import.sqliteFile')}</div>
                   <div className="text-[var(--ide-text-4)] text-xs">.db .sqlite .sqlite3 .sql</div>
                 </div>
               </button>
@@ -612,7 +646,7 @@ export default function App() {
               >
                 <Upload size={12} aria-hidden="true" />
                 <div>
-                  <div className="text-[var(--ide-text)]">Data file → DuckDB</div>
+                  <div className="text-[var(--ide-text)]">{t('import.dataFile')}</div>
                   <div className="text-[var(--ide-text-4)] text-xs">.csv .tsv .json .parquet</div>
                 </div>
               </button>
@@ -629,7 +663,7 @@ export default function App() {
           className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors"
         >
           <WandSparkles size={13} aria-hidden="true" />
-          Format
+          {t('toolbar.format')}
         </button>
 
         {/* Share button */}
@@ -639,7 +673,7 @@ export default function App() {
           className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors"
         >
           {shareCopied ? <Check size={13} className="text-green-400" aria-hidden="true" /> : <Link size={13} aria-hidden="true" />}
-          {shareCopied ? 'Copied!' : 'Share'}
+          {shareCopied ? t('toolbar.shareCopied') : t('toolbar.share')}
         </button>
 
         {/* Export dropdown */}
@@ -654,7 +688,7 @@ export default function App() {
             className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ide-surface2)] hover:bg-[var(--ide-surface3)] border border-[var(--ide-border)] rounded-lg text-sm transition-colors disabled:opacity-40"
           >
             <Download size={13} aria-hidden="true" />
-            Export
+            {t('toolbar.export')}
             <ChevronDown size={11} aria-hidden="true" />
           </button>
           {showExportMenu && (
@@ -667,14 +701,14 @@ export default function App() {
                 className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[var(--ide-surface2)] text-left text-[var(--ide-text)]"
               >
                 <Download size={12} aria-hidden="true" />
-                Excel (.xlsx)
+                {t('export.excel')}
               </button>
               <button
                 onClick={() => { setShowExportMenu(false); handleExportCSV() }}
                 className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[var(--ide-surface2)] text-left text-[var(--ide-text)]"
               >
                 <Download size={12} aria-hidden="true" />
-                CSV (.csv)
+                {t('export.csv')}
               </button>
             </div>
           )}
@@ -688,13 +722,13 @@ export default function App() {
             aria-label="Save query as favorite"
           >
             <label htmlFor="fav-name-input" className="sr-only">
-              Favorite name
+              {t('toolbar.favoriteName')}
             </label>
             <input
               id="fav-name-input"
               autoFocus
               className="bg-[var(--ide-surface)] border border-yellow-500/60 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-yellow-400 w-44 text-[var(--ide-text)]"
-              placeholder="Favorite name…"
+              placeholder={t('toolbar.favoriteNamePlaceholder')}
               value={favName}
               onChange={(e) => setFavName(e.target.value)}
               onKeyDown={(e) => {
@@ -744,7 +778,7 @@ export default function App() {
           }`}
         >
           <Clock size={13} aria-hidden="true" />
-          History
+          {t('toolbar.history')}
         </button>
 
         {/* AI Help toggle — only shown when AI is enabled AND user is logged in */}
@@ -760,7 +794,7 @@ export default function App() {
             }`}
           >
             <Sparkles size={13} aria-hidden="true" />
-            AI Help
+            {t('toolbar.aiHelp')}
           </button>
         )}
 
@@ -768,7 +802,7 @@ export default function App() {
         {aiEnabled && auth.token && (
           <button
             onClick={() => setCertPanelOpen(!certPanelOpen)}
-            aria-label={certPanelOpen ? "Fermer la préparation Test SQL" : "Ouvrir la préparation Test SQL"}
+            aria-label={certPanelOpen ? t('cert.panel.closeAriaLabel') : t('cert.panel.openAriaLabel')}
             aria-pressed={certPanelOpen}
             className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm transition-colors ${
               certPanelOpen
@@ -777,7 +811,7 @@ export default function App() {
             }`}
           >
             <BookOpen size={13} aria-hidden="true" />
-            Test
+            {t('toolbar.test')}
           </button>
         )}
 
@@ -811,7 +845,7 @@ export default function App() {
                 className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--ide-surface2)] text-left text-[var(--ide-text)]"
               >
                 <Keyboard size={13} aria-hidden="true" />
-                Raccourcis clavier
+                {t('settings.shortcuts')}
               </button>
               <button
                 onClick={toggleTheme}
@@ -822,17 +856,33 @@ export default function App() {
                 ) : (
                   <Moon size={13} aria-hidden="true" />
                 )}
-                {theme === "dark" ? "Mode clair" : "Mode sombre"}
+                {theme === "dark" ? t('settings.lightMode') : t('settings.darkMode')}
               </button>
+              {/* Language switcher */}
+              <div className="flex items-center gap-1 px-3 py-2">
+                <span className="text-xs text-[var(--ide-text-3)] mr-1">{t('settings.language')}</span>
+                <button
+                  onClick={() => setLanguage('en')}
+                  className={`flex-1 py-1 rounded text-xs font-medium transition-colors ${language === 'en' ? 'bg-blue-600 text-white' : 'bg-[var(--ide-surface2)] text-[var(--ide-text-2)] hover:bg-[var(--ide-surface3)]'}`}
+                >
+                  EN
+                </button>
+                <button
+                  onClick={() => setLanguage('fr')}
+                  className={`flex-1 py-1 rounded text-xs font-medium transition-colors ${language === 'fr' ? 'bg-blue-600 text-white' : 'bg-[var(--ide-surface2)] text-[var(--ide-text-2)] hover:bg-[var(--ide-surface3)]'}`}
+                >
+                  FR
+                </button>
+              </div>
               <div className="border-t border-[var(--ide-border)] my-1" />
               {auth.token ? (
                 <button
                   onClick={() => { setShowSettingsMenu(false); logout(); }}
-                  title={`Connecté en tant que ${auth.username}`}
+                  title={t('settings.signedInAs', { username: auth.username })}
                   className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--ide-surface2)] text-left text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300"
                 >
                   <LogOut size={13} aria-hidden="true" />
-                  Se déconnecter
+                  {t('settings.signOut')}
                 </button>
               ) : (
                 <button
@@ -840,7 +890,7 @@ export default function App() {
                   className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--ide-surface2)] text-left text-[var(--ide-text)]"
                 >
                   <LogIn size={13} aria-hidden="true" />
-                  Se connecter
+                  {t('settings.signIn')}
                 </button>
               )}
             </div>
@@ -854,7 +904,7 @@ export default function App() {
         {!showSidebar && (
           <button
             onClick={toggleSidebar}
-            aria-label="Show table explorer"
+            aria-label={t('toolbar.showTableExplorer')}
             aria-expanded={false}
             aria-controls="sidebar-panel"
             className="absolute left-0 top-1/2 z-10 -translate-y-1/2 bg-[var(--ide-surface2)] border border-[var(--ide-border)] p-0.5 rounded-r"
@@ -881,7 +931,7 @@ export default function App() {
             />
             <button
               onClick={toggleSidebar}
-              aria-label="Hide table explorer"
+              aria-label={t('toolbar.hideTableExplorer')}
               aria-expanded={true}
               aria-controls="sidebar-panel"
               className="absolute top-2 right-2 p-0.5 hover:bg-[var(--ide-surface3)] rounded text-[var(--ide-text-4)] hover:text-[var(--ide-text-2)]"
@@ -993,7 +1043,7 @@ export default function App() {
                     : "text-[var(--ide-text-3)] hover:text-[var(--ide-text-2)]"
                 }`}
               >
-                <TableIcon size={11} aria-hidden="true" /> Table
+                <TableIcon size={11} aria-hidden="true" /> {t('results.tabs.table')}
               </button>
               <button
                 role="tab"
@@ -1006,7 +1056,7 @@ export default function App() {
                     : "text-[var(--ide-text-3)] hover:text-[var(--ide-text-2)]"
                 }`}
               >
-                <BarChart2 size={11} aria-hidden="true" /> Chart
+                <BarChart2 size={11} aria-hidden="true" /> {t('results.tabs.chart')}
               </button>
               <button
                 onClick={() => setActiveResultTab("schema")}
@@ -1017,7 +1067,7 @@ export default function App() {
                 }`}
                 aria-pressed={activeResultTab === "schema"}
               >
-                <Network size={11} /> Schema
+                <Network size={11} /> {t('results.tabs.schema')}
               </button>
               {/* Chart type selector — only visible in chart tab */}
               {activeResultTab === "chart" && (
@@ -1067,7 +1117,7 @@ export default function App() {
                     className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
                     aria-hidden="true"
                   />
-                  Executing query…
+                  {t('results.executing')}
                 </div>
               ) : result ? (
                 activeResultTab === "table" ? (
@@ -1097,7 +1147,7 @@ export default function App() {
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-[var(--ide-text-4)] text-sm">
-                  Run a query to see results (Ctrl+Enter / ⌘+Enter)
+                  {t('results.noQuery')}
                 </div>
               )}
             </div>
@@ -1109,7 +1159,7 @@ export default function App() {
           <div
             id="right-panel"
             role="complementary"
-            aria-label="History and favorites"
+            aria-label={t('rightPanel.ariaLabel')}
             className="w-72 shrink-0 border-l border-[var(--ide-border)] overflow-hidden flex flex-col"
           >
             {/* Panel tabs */}
@@ -1129,7 +1179,7 @@ export default function App() {
                     : "border-transparent text-[var(--ide-text-3)] hover:text-[var(--ide-text-2)]"
                 }`}
               >
-                <Clock size={11} aria-hidden="true" /> History
+                <Clock size={11} aria-hidden="true" /> {t('toolbar.history')}
               </button>
               <button
                 role="tab"
@@ -1142,7 +1192,7 @@ export default function App() {
                     : "border-transparent text-[var(--ide-text-3)] hover:text-[var(--ide-text-2)]"
                 }`}
               >
-                <Star size={11} aria-hidden="true" /> Favorites
+                <Star size={11} aria-hidden="true" /> {t('toolbar.favorites')}
                 {favoriteQueries.length > 0 && (
                   <span
                     className="bg-yellow-600/40 text-yellow-300 text-xs px-1.5 rounded-full"
@@ -1208,7 +1258,7 @@ export default function App() {
             {/* Horizontal resize handle — drag left to widen, right to narrow */}
             <div
               role="separator"
-              aria-label="Redimensionner le panneau Test SQL"
+              aria-label={t('cert.panel.resizeAriaLabel')}
               aria-orientation="vertical"
               className="w-1.5 shrink-0 cursor-col-resize bg-[var(--ide-border)] hover:bg-blue-500/40 transition-colors active:bg-blue-500/60"
               onMouseDown={(e) => {
@@ -1232,12 +1282,13 @@ export default function App() {
             />
             <div
               role="complementary"
-              aria-label="Préparation Test SQL"
+              aria-label={t('cert.panel.ariaLabel')}
               className="shrink-0 overflow-hidden flex flex-col"
               style={{ width: certPanelWidth }}
             >
               <CertPanel
                 token={auth.token}
+                language={language}
                 onClose={() => setCertPanelOpen(false)}
               />
             </div>
