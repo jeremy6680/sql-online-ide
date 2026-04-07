@@ -1,4 +1,4 @@
-// src/components/CertPanel.tsx — ENI SQL Certification Prep panel
+// src/components/CertPanel.tsx — SQL Certification Test panel
 
 import { useState, useRef, useEffect } from "react";
 import {
@@ -13,6 +13,7 @@ import {
   Trophy,
   Copy,
   Check,
+  ClipboardList,
 } from "lucide-react";
 import type {
   CertPart,
@@ -42,7 +43,16 @@ const TYPE_LABELS: Record<CertQuestionType, string> = {
   practical: "Cas pratique",
 };
 
-type PanelState = "setup" | "loading" | "question" | "feedback";
+// Cost estimate for exam generation (20 questions via claude-haiku-4-5)
+const EXAM_COST = { usd: 0.06, eur: 0.055 };
+
+type PanelState =
+  | "setup"
+  | "loading"
+  | "question"
+  | "feedback"
+  | "exam-loading"
+  | "exam-results";
 
 function normalizeRows(rows: unknown[][]): string[][] {
   return rows
@@ -58,11 +68,9 @@ function resultsMatch(
   expectedCols: string[],
   expectedRows: unknown[][],
 ): boolean {
+  // Column count must match, but names are not compared — renaming a column
+  // (e.g. "total" vs "montant_total") should not invalidate a correct answer
   if (userCols.length !== expectedCols.length) return false;
-  const uSorted = [...userCols].sort();
-  const eSorted = [...expectedCols].sort();
-  if (uSorted.some((c, i) => c.toLowerCase() !== eSorted[i].toLowerCase()))
-    return false;
   if (userRows.length !== expectedRows.length) return false;
   const uNorm = normalizeRows(userRows);
   const eNorm = normalizeRows(expectedRows);
@@ -94,7 +102,6 @@ function SchemaBlock({ sql }: { sql: string }) {
           </span>
           {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         </button>
-        {/* Copy button — pastes schema SQL into clipboard so user can run it in the main editor */}
         <button
           onClick={handleCopy}
           title="Copier le SQL du schéma pour le coller dans l'éditeur"
@@ -154,8 +161,7 @@ function ChoiceButton({
       "bg-[var(--ide-surface2)] border-[var(--ide-border)] hover:bg-[var(--ide-surface3)]";
   }
 
-  // Detect SQL-like content to use monospace formatting
-  const sqlKeywords = ["SELECT", "INSERT", "UPDATE", "DELETE", "CREATE", "AVG(", "COUNT(", "SUM(", "WHERE", "FROM"];
+  const sqlKeywords = ["SELECT", "INSERT", "UPDATE", "DELETE", "CREATE", "AVG(", "COUNT(", "SUM(", "WHERE", "FROM", "WITH"];
   const isCode =
     text.includes("\n") ||
     sqlKeywords.some((kw) => text.trim().toUpperCase().startsWith(kw));
@@ -166,7 +172,6 @@ function ChoiceButton({
       disabled={revealed}
       className={`w-full text-left flex gap-3 px-3 py-2.5 border rounded-lg transition-colors text-xs disabled:cursor-default ${bg}`}
     >
-      {/* Radio (QCU) or checkbox (QCM) indicator */}
       <span
         className={`shrink-0 w-5 h-5 flex items-center justify-center border border-current font-bold ${multi ? "rounded" : "rounded-full"}`}
       >
@@ -191,23 +196,108 @@ function ChoiceButton({
   );
 }
 
+// ── ExamResultsScreen ────────────────────────────────────────────────────────
+
+function ExamResultsScreen({
+  questions,
+  answers,
+  onRestart,
+}: {
+  questions: CertQuestion[];
+  answers: boolean[];
+  onRestart: () => void;
+}) {
+  const total = answers.length;
+  const correct = answers.filter(Boolean).length;
+  const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+
+  // Per-part breakdown
+  const partStats = ([1, 2, 3, 4] as CertPart[]).map((part) => {
+    const qs = questions
+      .map((q, i) => ({ q, ok: answers[i] }))
+      .filter(({ q }) => q.part === part);
+    const partCorrect = qs.filter(({ ok }) => ok).length;
+    return { part, correct: partCorrect, total: qs.length };
+  });
+
+  const passed = pct >= 70;
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Score banner */}
+      <div
+        className={`flex flex-col items-center gap-1 px-4 py-5 rounded-xl border ${
+          passed
+            ? "dark:bg-green-600/10 bg-green-50 dark:border-green-500/40 border-green-300"
+            : "dark:bg-red-600/10 bg-red-50 dark:border-red-500/40 border-red-300"
+        }`}
+      >
+        <Trophy
+          size={28}
+          className={passed ? "text-yellow-500" : "text-[var(--ide-text-3)]"}
+        />
+        <p className="text-3xl font-bold mt-1">
+          {correct}/{total}
+        </p>
+        <p
+          className={`text-sm font-semibold ${passed ? "dark:text-green-300 text-green-700" : "dark:text-red-300 text-red-700"}`}
+        >
+          {pct}% — {passed ? "Réussi !" : "À améliorer"}
+        </p>
+      </div>
+
+      {/* Per-part breakdown */}
+      <div className="flex flex-col gap-1.5">
+        <p className="text-xs font-semibold text-[var(--ide-text-2)]">
+          Détail par partie
+        </p>
+        {partStats.map(({ part, correct: c, total: t }) => {
+          if (t === 0) return null;
+          const partPct = Math.round((c / t) * 100);
+          return (
+            <div
+              key={part}
+              className="flex items-center gap-2 text-xs"
+            >
+              <span className="text-[var(--ide-text-3)] w-4 shrink-0">
+                P{part}
+              </span>
+              <div className="flex-1 h-1.5 bg-[var(--ide-surface2)] rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${partPct >= 70 ? "bg-emerald-500" : "bg-red-400"}`}
+                  style={{ width: `${partPct}%` }}
+                />
+              </div>
+              <span className="text-[var(--ide-text-3)] w-10 text-right shrink-0">
+                {c}/{t}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <button
+        onClick={onRestart}
+        className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
+      >
+        <RefreshCw size={13} />
+        Retour à l'accueil
+      </button>
+    </div>
+  );
+}
+
 // ── Main component ──────────────────────────────────────────────────────────
 
 export function CertPanel({ token, onClose }: Props) {
   const [panelState, setPanelState] = useState<PanelState>("setup");
-  const [selectedPart, setSelectedPart] = useState<CertPart | "random">(
-    "random",
-  );
-  const [selectedType, setSelectedType] = useState<CertQuestionType | "random">(
-    "random",
-  );
+  const [selectedPart, setSelectedPart] = useState<CertPart | "random">("random");
+  const [selectedType, setSelectedType] = useState<CertQuestionType | "random">("random");
   const [question, setQuestion] = useState<CertQuestion | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // QCU/QCM selection
-  const [selectedChoices, setSelectedChoices] = useState<Set<string>>(
-    new Set(),
-  );
+  const [selectedChoices, setSelectedChoices] = useState<Set<string>>(new Set());
 
   // Practical case
   const [userSQL, setUserSQL] = useState("");
@@ -219,8 +309,14 @@ export function CertPanel({ token, onClose }: Props) {
   const [feedbackDetail, setFeedbackDetail] = useState<string | null>(null);
   const [showCorrectSQL, setShowCorrectSQL] = useState(false);
 
-  // Session score
+  // Session score (single mode)
   const [score, setScore] = useState({ correct: 0, total: 0 });
+
+  // Exam mode
+  const [isExamMode, setIsExamMode] = useState(false);
+  const [examQuestions, setExamQuestions] = useState<CertQuestion[]>([]);
+  const [examIndex, setExamIndex] = useState(0);
+  const [examAnswers, setExamAnswers] = useState<boolean[]>([]);
 
   useEffect(() => {
     if (panelState === "question" && question?.type === "practical") {
@@ -228,13 +324,18 @@ export function CertPanel({ token, onClose }: Props) {
     }
   }, [panelState, question]);
 
-  async function handleGenerate() {
-    setError(null);
-    setQuestion(null);
+  function resetQuestionState() {
     setSelectedChoices(new Set());
     setUserSQL("");
     setShowCorrectSQL(false);
     setFeedbackDetail(null);
+  }
+
+  async function handleGenerate() {
+    setError(null);
+    setQuestion(null);
+    setIsExamMode(false);
+    resetQuestionState();
     setPanelState("loading");
 
     const body: Record<string, unknown> = {};
@@ -250,10 +351,7 @@ export function CertPanel({ token, onClose }: Props) {
         },
         body: JSON.stringify(body),
       });
-      const data = (await res.json()) as {
-        question?: CertQuestion;
-        error?: string;
-      };
+      const data = (await res.json()) as { question?: CertQuestion; error?: string };
       if (!res.ok || data.error) throw new Error(data.error ?? "Erreur serveur");
       setQuestion(data.question!);
       setPanelState("question");
@@ -261,6 +359,49 @@ export function CertPanel({ token, onClose }: Props) {
       setError(String(err));
       setPanelState("setup");
     }
+  }
+
+  async function handleGenerateExam() {
+    setError(null);
+    setIsExamMode(true);
+    setExamQuestions([]);
+    setExamIndex(0);
+    setExamAnswers([]);
+    setScore({ correct: 0, total: 0 });
+    setPanelState("exam-loading");
+
+    try {
+      const res = await fetch("/api/cert/exam", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const data = (await res.json()) as { questions?: CertQuestion[]; error?: string };
+      if (!res.ok || data.error) throw new Error(data.error ?? "Erreur serveur");
+      const qs = data.questions!;
+      setExamQuestions(qs);
+      setQuestion(qs[0]);
+      resetQuestionState();
+      setPanelState("question");
+    } catch (err) {
+      setError(String(err));
+      setIsExamMode(false);
+      setPanelState("setup");
+    }
+  }
+
+  function recordResult(correct: boolean) {
+    if (isExamMode) {
+      setExamAnswers((prev) => [...prev, correct]);
+    }
+    setScore((s) => ({
+      correct: s.correct + (correct ? 1 : 0),
+      total: s.total + 1,
+    }));
+    setIsCorrect(correct);
+    setPanelState("feedback");
   }
 
   function toggleChoice(label: string, type: CertQuestionType) {
@@ -278,18 +419,12 @@ export function CertPanel({ token, onClose }: Props) {
   }
 
   function handleSubmitChoices() {
-    if (!question || (question.type !== "qcu" && question.type !== "qcm"))
-      return;
+    if (!question || (question.type !== "qcu" && question.type !== "qcm")) return;
     const q = question as CertQuestionQCU | CertQuestionQCM;
     const correct =
       selectedChoices.size === q.correctAnswers.length &&
       q.correctAnswers.every((a) => selectedChoices.has(a));
-    setIsCorrect(correct);
-    setScore((s) => ({
-      correct: s.correct + (correct ? 1 : 0),
-      total: s.total + 1,
-    }));
-    setPanelState("feedback");
+    recordResult(correct);
   }
 
   async function handleSubmitPractical() {
@@ -307,10 +442,8 @@ export function CertPanel({ token, onClose }: Props) {
       ]);
 
       if (actual.error) {
-        setIsCorrect(false);
         setFeedbackDetail(`Erreur SQL : ${actual.error}`);
-        setScore((s) => ({ ...s, total: s.total + 1 }));
-        setPanelState("feedback");
+        recordResult(false);
         return;
       }
 
@@ -320,35 +453,47 @@ export function CertPanel({ token, onClose }: Props) {
         expected.columns,
         expected.rows,
       );
-      setIsCorrect(match);
-      setScore((s) => ({
-        correct: s.correct + (match ? 1 : 0),
-        total: s.total + 1,
-      }));
 
       if (!match) {
-        const lines: string[] = [];
-        if (actual.rowCount !== expected.rowCount)
-          lines.push(
-            `Lignes obtenues : ${actual.rowCount} · Attendu : ${expected.rowCount}`,
-          );
-        const missing = expected.columns.filter(
-          (c) =>
-            !actual.columns
-              .map((x) => x.toLowerCase())
-              .includes(c.toLowerCase()),
-        );
-        if (missing.length)
-          lines.push(`Colonnes manquantes : ${missing.join(", ")}`);
-        setFeedbackDetail(
-          lines.join("\n") ||
-            "Le résultat ne correspond pas au résultat attendu.",
-        );
+        const detail =
+          actual.rowCount !== expected.rowCount
+            ? `Lignes obtenues : ${actual.rowCount} · Attendu : ${expected.rowCount}`
+            : actual.columns.length !== expected.columns.length
+              ? `Colonnes obtenues : ${actual.columns.length} · Attendu : ${expected.columns.length}`
+              : "Le résultat ne correspond pas au résultat attendu.";
+        setFeedbackDetail(detail);
       }
+
+      recordResult(match);
     } finally {
       setIsRunning(false);
-      setPanelState("feedback");
     }
+  }
+
+  function handleNextQuestion() {
+    if (isExamMode) {
+      const nextIndex = examIndex + 1;
+      if (nextIndex >= examQuestions.length) {
+        setPanelState("exam-results");
+      } else {
+        setExamIndex(nextIndex);
+        setQuestion(examQuestions[nextIndex]);
+        resetQuestionState();
+        setPanelState("question");
+      }
+    } else {
+      setPanelState("setup");
+    }
+  }
+
+  function handleRestartFromExamResults() {
+    setIsExamMode(false);
+    setExamQuestions([]);
+    setExamIndex(0);
+    setExamAnswers([]);
+    setScore({ correct: 0, total: 0 });
+    setQuestion(null);
+    setPanelState("setup");
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -362,10 +507,24 @@ export function CertPanel({ token, onClose }: Props) {
       >
         <div className="flex items-center gap-2">
           <BookOpen size={14} className="text-emerald-500" aria-hidden="true" />
-          <span className="text-sm font-semibold">Préparation ENI SQL</span>
+          <span className="text-sm font-semibold">
+            {isExamMode ? "Examen blanc SQL" : "Préparation Test SQL"}
+          </span>
         </div>
         <div className="flex items-center gap-2">
-          {score.total > 0 && (
+          {/* Score badge: current score during exam, or session score in single mode */}
+          {isExamMode && score.total > 0 && (panelState === "question" || panelState === "feedback") && (
+            <span
+              className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[var(--ide-surface2)] border border-[var(--ide-border)]"
+              title="Score de l'examen en cours"
+            >
+              <Trophy size={10} className="text-yellow-500" />
+              <span className="font-medium">
+                {score.correct}/{score.total}
+              </span>
+            </span>
+          )}
+          {!isExamMode && score.total > 0 && (
             <span
               className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[var(--ide-surface2)] border border-[var(--ide-border)]"
               title="Score de la session"
@@ -378,7 +537,7 @@ export function CertPanel({ token, onClose }: Props) {
           )}
           <button
             onClick={onClose}
-            aria-label="Fermer le panneau de certification"
+            aria-label="Fermer le panneau de préparation"
             className="text-[var(--ide-text-3)] hover:text-[var(--ide-text)] p-1 rounded hover:bg-[var(--ide-surface2)]"
           >
             <X size={14} />
@@ -387,12 +546,13 @@ export function CertPanel({ token, onClose }: Props) {
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3">
+
         {/* ── Setup ──────────────────────────────────────────────────────── */}
         {panelState === "setup" && (
           <>
             <p className="text-xs text-[var(--ide-text-3)] leading-relaxed">
-              L'IA génère une question originale dans l'esprit de l'examen ENI
-              SQL. Choisissez une partie et un type, ou laissez sur Aléatoire.
+              L'IA génère une question originale dans l'esprit du test SQL.
+              Choisissez une partie et un type, ou laissez sur Aléatoire.
             </p>
 
             {error && (
@@ -441,13 +601,11 @@ export function CertPanel({ token, onClose }: Props) {
                 className="text-xs px-2 py-1.5 rounded-lg border border-[var(--ide-border)] bg-[var(--ide-surface2)] text-[var(--ide-text)] focus:outline-none focus:border-emerald-500"
               >
                 <option value="random">Aléatoire</option>
-                {(["qcu", "qcm", "practical"] as CertQuestionType[]).map(
-                  (t) => (
-                    <option key={t} value={t}>
-                      {TYPE_LABELS[t]}
-                    </option>
-                  ),
-                )}
+                {(["qcu", "qcm", "practical"] as CertQuestionType[]).map((t) => (
+                  <option key={t} value={t}>
+                    {TYPE_LABELS[t]}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -458,23 +616,66 @@ export function CertPanel({ token, onClose }: Props) {
               <RefreshCw size={13} />
               Générer une question
             </button>
+
+            {/* Divider */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-px bg-[var(--ide-border)]" />
+              <span className="text-xs text-[var(--ide-text-3)]">ou</span>
+              <div className="flex-1 h-px bg-[var(--ide-border)]" />
+            </div>
+
+            {/* Exam generation */}
+            <button
+              onClick={handleGenerateExam}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 border border-emerald-600 dark:border-emerald-500 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-600/10 rounded-lg text-sm font-medium transition-colors"
+            >
+              <ClipboardList size={13} />
+              Générer un examen blanc (20 questions)
+            </button>
+            <p className="text-xs text-[var(--ide-text-3)] text-center -mt-1.5">
+              Coût estimé : ~{EXAM_COST.usd.toFixed(2)} $ ≈ {EXAM_COST.eur.toFixed(2)} €
+            </p>
           </>
         )}
 
-        {/* ── Loading ─────────────────────────────────────────────────────── */}
+        {/* ── Loading (single question) ────────────────────────────────── */}
         {panelState === "loading" && (
           <div className="flex flex-col items-center justify-center gap-3 py-10 text-[var(--ide-text-3)]">
-            <Loader2
-              size={22}
-              className="animate-spin text-emerald-500"
-            />
+            <Loader2 size={22} className="animate-spin text-emerald-500" />
             <p className="text-xs">Génération de la question…</p>
+          </div>
+        )}
+
+        {/* ── Exam loading ─────────────────────────────────────────────── */}
+        {panelState === "exam-loading" && (
+          <div className="flex flex-col items-center justify-center gap-3 py-10 text-[var(--ide-text-3)]">
+            <Loader2 size={22} className="animate-spin text-emerald-500" />
+            <p className="text-xs font-medium">Génération de l'examen…</p>
+            <p className="text-xs text-center leading-relaxed max-w-48">
+              20 questions générées par lots — comptez environ 15 secondes.
+            </p>
           </div>
         )}
 
         {/* ── Question ────────────────────────────────────────────────────── */}
         {panelState === "question" && question && (
           <>
+            {/* Exam progress bar */}
+            {isExamMode && (
+              <div className="flex flex-col gap-1">
+                <div className="flex justify-between text-xs text-[var(--ide-text-3)]">
+                  <span>Question {examIndex + 1} / {examQuestions.length}</span>
+                  <span>{Math.round((examIndex / examQuestions.length) * 100)}%</span>
+                </div>
+                <div className="h-1 bg-[var(--ide-surface2)] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 rounded-full transition-all"
+                    style={{ width: `${(examIndex / examQuestions.length) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Badges */}
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs px-2 py-0.5 rounded-full dark:bg-emerald-600/20 bg-emerald-100 dark:text-emerald-300 text-emerald-700 dark:border-emerald-600/40 border-emerald-400 border font-medium">
@@ -553,9 +754,7 @@ export function CertPanel({ token, onClose }: Props) {
             {/* Practical */}
             {question.type === "practical" && (
               <div className="flex flex-col gap-3">
-                <SchemaBlock
-                  sql={(question as CertQuestionPractical).schemaSQL}
-                />
+                <SchemaBlock sql={(question as CertQuestionPractical).schemaSQL} />
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-[var(--ide-text-2)]">
                     Votre requête SQL
@@ -611,22 +810,18 @@ export function CertPanel({ token, onClose }: Props) {
             {/* QCU/QCM revealed choices */}
             {(question.type === "qcu" || question.type === "qcm") && (
               <div className="flex flex-col gap-1.5">
-                {(question as CertQuestionQCU | CertQuestionQCM).choices.map(
-                  (c) => (
-                    <ChoiceButton
-                      key={c.label}
-                      label={c.label}
-                      text={c.text}
-                      selected={selectedChoices.has(c.label)}
-                      correct={(
-                        question as CertQuestionQCU
-                      ).correctAnswers.includes(c.label)}
-                      revealed={true}
-                      multi={question.type === "qcm"}
-                      onClick={() => {}}
-                    />
-                  ),
-                )}
+                {(question as CertQuestionQCU | CertQuestionQCM).choices.map((c) => (
+                  <ChoiceButton
+                    key={c.label}
+                    label={c.label}
+                    text={c.text}
+                    selected={selectedChoices.has(c.label)}
+                    correct={(question as CertQuestionQCU).correctAnswers.includes(c.label)}
+                    revealed={true}
+                    multi={question.type === "qcm"}
+                    onClick={() => {}}
+                  />
+                ))}
               </div>
             )}
 
@@ -639,9 +834,7 @@ export function CertPanel({ token, onClose }: Props) {
 
             {/* Explanation */}
             <div className="text-xs bg-[var(--ide-surface2)] rounded-lg px-3 py-2.5 border border-[var(--ide-border)] leading-relaxed text-[var(--ide-text-2)]">
-              <p className="font-semibold text-[var(--ide-text)] mb-1">
-                Explication
-              </p>
+              <p className="font-semibold text-[var(--ide-text)] mb-1">Explication</p>
               {question.explanation}
             </div>
 
@@ -652,11 +845,7 @@ export function CertPanel({ token, onClose }: Props) {
                   onClick={() => setShowCorrectSQL((v) => !v)}
                   className="flex items-center gap-1.5 text-xs dark:text-emerald-400 text-emerald-600 dark:hover:text-emerald-300 hover:text-emerald-700 transition-colors"
                 >
-                  {showCorrectSQL ? (
-                    <ChevronUp size={12} />
-                  ) : (
-                    <ChevronDown size={12} />
-                  )}
+                  {showCorrectSQL ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                   {showCorrectSQL ? "Masquer" : "Voir"} la solution
                 </button>
                 {showCorrectSQL && (
@@ -667,15 +856,28 @@ export function CertPanel({ token, onClose }: Props) {
               </div>
             )}
 
-            {/* Next question */}
+            {/* Next */}
             <button
-              onClick={() => setPanelState("setup")}
+              onClick={handleNextQuestion}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
             >
               <RefreshCw size={13} />
-              Question suivante
+              {isExamMode
+                ? examIndex + 1 < examQuestions.length
+                  ? "Question suivante"
+                  : "Voir les résultats"
+                : "Question suivante"}
             </button>
           </>
+        )}
+
+        {/* ── Exam results ─────────────────────────────────────────────── */}
+        {panelState === "exam-results" && (
+          <ExamResultsScreen
+            questions={examQuestions}
+            answers={examAnswers}
+            onRestart={handleRestartFromExamResults}
+          />
         )}
       </div>
     </div>
