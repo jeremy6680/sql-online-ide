@@ -142,6 +142,7 @@ export default function App() {
   const [aiEnabled, setAIEnabled] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showEngineMenu, setShowEngineMenu] = useState(false);
   const [certPanelWidth, setCertPanelWidth] = useState(384);
   const [schemaMap, setSchemaMap] = useState<Record<string, string[]>>({});
   const [shareCopied, setShareCopied] = useState(false);
@@ -549,33 +550,51 @@ export default function App() {
           </span>
         </div>
 
-        {/* Engine Selector */}
-        <div
-          role="group"
-          aria-label="Database engine"
-          className="flex items-center gap-1 rounded-lg p-0.5 border border-[var(--ide-border)]"
-          style={{ background: "var(--ide-bg)" }}
-        >
-          {(Object.keys(ENGINE_LABELS) as DbEngine[]).map((e) => (
-            <button
-              key={e}
-              onClick={() => handleEngineChange(e)}
-              aria-pressed={engine === e}
-              aria-label={`Switch to ${ENGINE_LABELS[e].label}${ENGINE_LABELS[e].wasm ? " (runs in browser)" : ""}`}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                engine === e
-                  ? `${ENGINE_LABELS[e].color} text-white shadow`
-                  : "text-[var(--ide-text-2)] hover:text-[var(--ide-text)] hover:bg-[var(--ide-surface2)]"
-              }`}
+        {/* Engine Selector — compact dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowEngineMenu(v => !v)}
+            aria-haspopup="listbox"
+            aria-expanded={showEngineMenu}
+            aria-label={`Database engine: ${ENGINE_LABELS[engine].label}`}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--ide-bg)] border border-[var(--ide-border)] rounded-lg text-xs font-medium hover:bg-[var(--ide-surface2)] transition-colors"
+          >
+            <span className={`w-2 h-2 rounded-full shrink-0 ${ENGINE_LABELS[engine].color}`} aria-hidden="true" />
+            {ENGINE_LABELS[engine].label}
+            {ENGINE_LABELS[engine].wasm && (
+              <span className="text-[9px] opacity-50" aria-hidden="true">WASM</span>
+            )}
+            <ChevronDown size={10} aria-hidden="true" />
+          </button>
+          {showEngineMenu && (
+            <div
+              role="listbox"
+              aria-label="Database engine"
+              className="absolute left-0 top-full mt-1 z-50 w-44 bg-[var(--ide-surface)] border border-[var(--ide-border)] rounded-lg shadow-xl py-1 text-sm"
+              onMouseLeave={() => setShowEngineMenu(false)}
             >
-              {ENGINE_LABELS[e].label}
-              {ENGINE_LABELS[e].wasm && (
-                <span className="ml-1 text-[9px] opacity-60" aria-hidden="true">
-                  WASM
-                </span>
-              )}
-            </button>
-          ))}
+              {(Object.keys(ENGINE_LABELS) as DbEngine[]).map((e) => (
+                <button
+                  key={e}
+                  role="option"
+                  aria-selected={engine === e}
+                  onClick={() => { handleEngineChange(e); setShowEngineMenu(false); }}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--ide-surface2)] text-left transition-colors ${
+                    engine === e ? "text-[var(--ide-text)]" : "text-[var(--ide-text-2)]"
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${ENGINE_LABELS[e].color}`} aria-hidden="true" />
+                  {ENGINE_LABELS[e].label}
+                  {ENGINE_LABELS[e].wasm && (
+                    <span className="text-[9px] text-[var(--ide-text-4)] ml-1" aria-hidden="true">WASM</span>
+                  )}
+                  {engine === e && (
+                    <Check size={11} className="ml-auto text-[var(--ide-text-3)] shrink-0" aria-hidden="true" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex-1" />
