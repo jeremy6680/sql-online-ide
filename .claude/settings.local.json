@@ -19,7 +19,11 @@
       "Bash(grep -n \"export.*Columns\" /Users/jeremymarchandeau/Code/personal/projects/sql-online-ide/src/engines/*.ts)",
       "Skill(commit-commands:commit)",
       "Skill(commit-commands:commit:*)",
-      "Bash(find /Users/jeremymarchandeau/Code/personal/projects/sql-online-ide/src -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) -exec grep -l \"Keyboard\\\\|Sign in\\\\|Invalid\\\\|credentials\" {} \\\\;)"
+      "Bash(find /Users/jeremymarchandeau/Code/personal/projects/sql-online-ide/src -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) -exec grep -l \"Keyboard\\\\|Sign in\\\\|Invalid\\\\|credentials\" {} \\\\;)",
+      "Bash(node -e \"const pkg = require\\('./package.json'\\); console.log\\(Object.keys\\(pkg.dependencies\\).filter\\(k => k.includes\\('openai'\\) || k.includes\\('rate'\\)\\)\\)\")",
+      "Bash(node --import tsx/esm server/index.ts)",
+      "Bash(curl -s http://localhost:3001/api/auth/status)",
+      "Read(//Users/jeremymarchandeau/Code/personal/projects/sql-online-ide/**)"
     ]
   }
 }

@@ -2,11 +2,36 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { DbEngine, HistoryEntry, QueryResult, RemoteConnection, TableInfo, ChartType, FavoriteQuery, SavedConnection, AuthState, QueryTab } from './types'
 
+export type AiProvider = 'anthropic' | 'openai'
+
+// Anthropic models available to users
+export const ANTHROPIC_MODELS = [
+  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (fast)' },
+  { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+  { id: 'claude-opus-4-6', label: 'Claude Opus 4.6 (powerful)' },
+] as const
+
+// OpenAI models available to users
+export const OPENAI_MODELS = [
+  { id: 'gpt-4o-mini', label: 'GPT-4o mini (fast)' },
+  { id: 'gpt-4o', label: 'GPT-4o' },
+  { id: 'o1-mini', label: 'o1-mini' },
+] as const
+
 interface AppState {
   // Auth
   auth: AuthState
   setAuth: (auth: AuthState) => void
   logout: () => void
+
+  // AI provider/model preferences (persisted, never stores actual keys)
+  aiProvider: AiProvider
+  setAiProvider: (p: AiProvider) => void
+  aiModel: string
+  setAiModel: (m: string) => void
+  /** Which providers have a stored key on the server (fetched after login) */
+  aiKeyPresence: { anthropic: boolean; openai: boolean }
+  setAiKeyPresence: (p: { anthropic: boolean; openai: boolean }) => void
 
   // Engine
   engine: DbEngine
@@ -86,7 +111,21 @@ export const useStore = create<AppState>()(
     (set) => ({
       auth: { token: null, username: null, authEnabled: true },
       setAuth: (auth) => set({ auth }),
-      logout: () => set({ auth: { token: null, username: null, authEnabled: true } }),
+      logout: () => set({
+        auth: { token: null, username: null, authEnabled: true },
+        aiKeyPresence: { anthropic: false, openai: false },
+        // Clear per-user data so the next user doesn't inherit them from localStorage
+        history: [],
+        favoriteQueries: [],
+        savedConnections: [],
+      }),
+
+      aiProvider: 'anthropic',
+      setAiProvider: (aiProvider) => set({ aiProvider }),
+      aiModel: 'claude-haiku-4-5-20251001',
+      setAiModel: (aiModel) => set({ aiModel }),
+      aiKeyPresence: { anthropic: false, openai: false },
+      setAiKeyPresence: (aiKeyPresence) => set({ aiKeyPresence }),
 
       engine: 'sqlite',
       setEngine: (engine) => set({ engine }),
@@ -172,7 +211,8 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'sql-ide-storage',
-      // Only persist token + username — authEnabled is always fetched fresh from the server
+      // Persist token/username + UI preferences. authEnabled always refetched from server.
+      // aiKeyPresence is NOT persisted — always refetched from server on login.
       partialize: (state) => ({
         auth: { token: state.auth.token, username: state.auth.username },
         history: state.history,
@@ -183,6 +223,8 @@ export const useStore = create<AppState>()(
         language: state.language,
         tabs: state.tabs,
         activeTabId: state.activeTabId,
+        aiProvider: state.aiProvider,
+        aiModel: state.aiModel,
       }),
       merge: (persisted, current) => ({
         ...current,

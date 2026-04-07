@@ -26,6 +26,7 @@ import {
   ChevronDown,
   BookOpen,
   Settings,
+  KeyRound,
 } from "lucide-react";
 import { Editor, type EditorHandle } from "./components/Editor";
 import { ResultsTable } from "./components/ResultsTable";
@@ -37,6 +38,7 @@ import { ConnectionModal } from "./components/ConnectionModal";
 import { SchemaView } from "./components/SchemaView";
 import { LoginModal } from "./components/LoginPage";
 import { AIHelpPanel } from "./components/AIHelpPanel";
+import { ApiKeySettings } from "./components/ApiKeySettings";
 import { CertPanel } from "./components/CertPanel";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 
@@ -121,6 +123,7 @@ export default function App() {
     setCertPanelOpen,
     language,
     setLanguage,
+    setAiKeyPresence,
   } = useStore();
 
   const { t } = useTranslation();
@@ -131,7 +134,14 @@ export default function App() {
     "table" | "chart" | "schema"
   >("table");
   const [showConnectionModal, setShowConnectionModal] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
+  // Detect ?reset_token=xxx in URL on load — opens reset-password view automatically
+  const [resetTokenFromUrl] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("reset_token");
+  });
+  const [showLoginModal, setShowLoginModal] = useState(() => {
+    return !!new URLSearchParams(window.location.search).get("reset_token");
+  });
   const [initialized, setInitialized] = useState(false);
   const [rightPanelTab, setRightPanelTab] = useState<"history" | "favorites">(
     "history",
@@ -140,6 +150,7 @@ export default function App() {
   const [favName, setFavName] = useState("");
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [aiEnabled, setAIEnabled] = useState(false);
+  const [showApiKeySettings, setShowApiKeySettings] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [showEngineMenu, setShowEngineMenu] = useState(false);
@@ -163,6 +174,7 @@ export default function App() {
     (token: string) => {
       if (serverDataLoadedRef.current) return;
       serverDataLoadedRef.current = true;
+      // Load history/favorites/connections — server always wins on login
       fetch("/api/user/data", {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -177,8 +189,23 @@ export default function App() {
           }
         })
         .catch(() => {});
+      // Fetch which AI providers have keys stored for this user
+      fetch("/api/user/api-keys", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => res.json())
+        .then((data: { anthropic: boolean; openai: boolean }) => {
+          setAiKeyPresence(data);
+          setAIEnabled(data.anthropic || data.openai || !!process.env.ANTHROPIC_API_KEY);
+        })
+        .catch(() => {});
+      // Also refresh AI status (counts env keys + user keys)
+      fetch("/api/ai/status", { headers: { Authorization: `Bearer ${token}` } })
+        .then((res) => res.json())
+        .then((data: { aiEnabled: boolean }) => setAIEnabled(data.aiEnabled))
+        .catch(() => {});
     },
-    [setHistory, setFavoriteQueries, setSavedConnections, setLanguage],
+    [setHistory, setFavoriteQueries, setSavedConnections, setLanguage, setAiKeyPresence],
   );
 
   const saveServerUserData = useCallback(
@@ -220,10 +247,13 @@ export default function App() {
 
   // On load: verify stored token is still valid; detect if auth is enabled; check AI status
   useEffect(() => {
-    // Check AI availability
-    fetch("/api/ai/status")
+    // Check AI availability (passing token so user-stored keys are counted too)
+    fetch("/api/ai/status", auth.token ? { headers: { Authorization: `Bearer ${auth.token}` } } : undefined)
       .then((res) => res.json())
-      .then((data: { aiEnabled: boolean }) => setAIEnabled(data.aiEnabled))
+      .then((data: { aiEnabled: boolean; providers?: { anthropic: boolean; openai: boolean } }) => {
+        setAIEnabled(data.aiEnabled);
+        if (data.providers) setAiKeyPresence(data.providers);
+      })
       .catch(() => {});
 
     // Check if auth is enabled on the server
@@ -876,14 +906,23 @@ export default function App() {
               </div>
               <div className="border-t border-[var(--ide-border)] my-1" />
               {auth.token ? (
-                <button
-                  onClick={() => { setShowSettingsMenu(false); logout(); }}
-                  title={t('settings.signedInAs', { username: auth.username })}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--ide-surface2)] text-left text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300"
-                >
-                  <LogOut size={13} aria-hidden="true" />
-                  {t('settings.signOut')}
-                </button>
+                <>
+                  <button
+                    onClick={() => { setShowSettingsMenu(false); setShowApiKeySettings(true); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--ide-surface2)] text-left text-[var(--ide-text)]"
+                  >
+                    <KeyRound size={13} aria-hidden="true" />
+                    API Keys
+                  </button>
+                  <button
+                    onClick={() => { setShowSettingsMenu(false); logout(); }}
+                    title={t('settings.signedInAs', { username: auth.username })}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--ide-surface2)] text-left text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300"
+                  >
+                    <LogOut size={13} aria-hidden="true" />
+                    {t('settings.signOut')}
+                  </button>
+                </>
               ) : (
                 <button
                   onClick={() => { setShowSettingsMenu(false); setShowLoginModal(true); }}
@@ -1248,6 +1287,10 @@ export default function App() {
                 setSql(sql);
                 setShowAIPanel(false);
               }}
+              onOpenApiKeySettings={() => {
+                setShowAIPanel(false);
+                setShowApiKeySettings(true);
+              }}
             />
           </div>
         )}
@@ -1346,7 +1389,30 @@ export default function App() {
 
       {/* Login Modal */}
       {showLoginModal && (
-        <LoginModal onClose={() => setShowLoginModal(false)} />
+        <LoginModal
+          onClose={() => {
+            setShowLoginModal(false);
+            // Clean up the reset token from the URL without reloading
+            if (resetTokenFromUrl) {
+              const url = new URL(window.location.href);
+              url.searchParams.delete("reset_token");
+              window.history.replaceState({}, "", url.toString());
+            }
+          }}
+          resetToken={resetTokenFromUrl ?? undefined}
+        />
+      )}
+
+      {/* API Key Settings Modal */}
+      {showApiKeySettings && auth.token && (
+        <ApiKeySettings
+          token={auth.token}
+          onClose={() => setShowApiKeySettings(false)}
+          onKeysChanged={(presence) => {
+            setAiKeyPresence(presence);
+            setAIEnabled(presence.anthropic || presence.openai);
+          }}
+        />
       )}
 
       {/* Shortcuts Modal */}
