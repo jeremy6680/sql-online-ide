@@ -13,10 +13,11 @@ sql-online-ide/
 │   │   ├── QueryHistory.tsx    # Scrollable history of past queries
 │   │   ├── FavoritesPanel.tsx  # Saved/named queries panel
 │   │   ├── ConnectionModal.tsx # Remote DB connection form + saved connections
-│   │   ├── LoginPage.tsx       # Login modal (JWT-based auth)
+│   │   ├── LoginPage.tsx       # Auth modal (sign in / sign up / forgot password / reset password)
+│   │   ├── ApiKeySettings.tsx  # Per-user API key management (Anthropic + OpenAI, AES-256-GCM encrypted)
 │   │   ├── SchemaView.tsx      # ERD-style schema diagram (SVG)
 │   │   ├── ShortcutsModal.tsx  # Keyboard shortcuts reference modal (open with `?`)
-│   │   ├── AIHelpPanel.tsx     # AI SQL assistant panel (natural language → SQL)
+│   │   ├── AIHelpPanel.tsx     # AI SQL assistant panel (natural language → SQL, provider + model selector)
 │   │   └── CertPanel.tsx       # ENI SQL certification prep panel (question generation + auto-correction)
 │   ├── engines/                # Database engine wrappers
 │   │   ├── sqlite.ts           # sql.js (WASM) — init, query, tables, columns, file load, isolated execution (cert)
@@ -25,19 +26,24 @@ sql-online-ide/
 │   ├── store.ts                # Zustand global state (persisted to localStorage)
 │   ├── types.ts                # Shared TypeScript types / interfaces
 │   ├── App.tsx                 # Root component — layout, toolbar, all wiring
+│   ├── i18n.ts                 # i18next config (EN + FR, browser language detection)
 │   ├── index.css               # CSS variables (theme tokens), global resets, scrollbar styles
 │   └── main.tsx                # React entry point
 │
 ├── server/                     # Backend (Express proxy)
 │   ├── index.ts                # Express app — unified /api/* endpoints, static serving
-│   ├── auth.ts                 # JWT auth middleware, credential validation, token signing
-│   ├── userData.ts             # File-based per-user store (history + favorites → data/users/)
+│   ├── auth.ts                 # JWT auth, bcrypt, self-registration, password reset tokens, rate limiting
+│   ├── userData.ts             # File-based per-user store (history + favorites + encrypted API keys)
+│   ├── apiKeys.ts              # AES-256-GCM encryption/decryption for user API keys
+│   ├── mailer.ts               # nodemailer SMTP wrapper — sends password reset emails
 │   ├── cert.ts                 # ENI SQL cert question generator — Claude prompt + JSON parsing
 │   ├── mysql.ts                # MySQL/MariaDB connector (mysql2) + router
 │   └── postgres.ts             # PostgreSQL connector (pg) + router
 │
 ├── data/                       # Runtime-generated, gitignored
-│   └── users/                  # Per-user JSON files: <username>.json (history + favorites)
+│   ├── auth/
+│   │   └── users.json          # Self-registered user accounts (username, email, bcrypt hash)
+│   └── users/                  # Per-user JSON files: <username>.json (history + favorites + encrypted keys)
 │
 ├── public/
 │   └── sql-wasm.wasm           # Pre-built sql.js WASM binary (SQLite engine)
@@ -60,7 +66,7 @@ sql-online-ide/
 
 ### `src/App.tsx`
 The root component and main orchestrator. Responsibilities:
-- Toolbar layout (engine selector, run button, import/export dropdowns, format, share, history toggle, theme toggle)
+- Toolbar layout (engine dropdown, run button, import/export dropdowns, format, share, history toggle, theme toggle)
 - Engine initialisation and switching (`handleEngineChange`)
 - Query execution routing (`handleRun`) — dispatches to the right engine wrapper
 - Table browsing and dropping
@@ -71,8 +77,9 @@ The root component and main orchestrator. Responsibilities:
 - Resizable editor/results split via drag handle (`editorHeightPct` state)
 - Multi-tab editor: tab bar above editor, syncs `sql`/`engine` with active `QueryTab` in store
 - URL hash sync: SQL + engine encoded on change, restored on first load (`Share` button copies the URL)
-- Settings dropdown (keyboard shortcuts, theme toggle, auth) replacing three individual toolbar buttons
+- Settings dropdown (keyboard shortcuts, theme toggle, API Keys, auth)
 - ENI Cert panel toggle + horizontal resize handle (`certPanelWidth` state, 280–700 px)
+- Detects `?reset_token=xxx` in URL on load and auto-opens the reset-password modal
 
 ### `src/store.ts`
 Zustand store, persisted to `localStorage`. Contains:
@@ -84,7 +91,10 @@ Zustand store, persisted to `localStorage`. Contains:
 - Saved connections (name + engine + RemoteConnection shape)
 - Panel visibility (sidebar, history panel, `certPanelOpen`)
 - Theme (`dark` | `light`)
+- Language (`en` | `fr`)
 - Auth state (JWT token, username, authEnabled flag)
+- AI preferences: `aiProvider` (`anthropic` | `openai`), `aiModel` (string), `aiKeyPresence` (booleans — never the raw keys)
+- On `logout()`: clears history, favoriteQueries, savedConnections, and aiKeyPresence to prevent data leaking to the next session
 
 ### `src/types.ts`
 All shared types. The canonical source of truth for:
@@ -108,20 +118,34 @@ Each file is a thin wrapper that exposes a consistent async API:
 Unified Express API surface:
 | Endpoint | Method | Auth required | Description |
 |---|---|---|---|
-| `/api/auth/status` | GET | No | Whether auth is enabled |
-| `/api/auth/login` | POST | No | Login — returns JWT |
+| `/api/auth/status` | GET | No | Whether auth + registration are enabled |
+| `/api/auth/login` | POST | No | Login with username or email — returns JWT |
+| `/api/auth/register` | POST | No | Create a new account (requires `ALLOW_REGISTRATION=true`) |
+| `/api/auth/forgot-password` | POST | No | Request a password reset email |
+| `/api/auth/reset-password` | POST | No | Apply a password reset using a valid token |
 | `/api/auth/me` | GET | Yes | Validate stored token |
-| `/api/user/data` | GET | Yes | Load user's history + favorites from server |
-| `/api/user/data` | POST | Yes | Save user's history + favorites to server |
-| `/api/ai/sql` | POST | Yes | Translate natural-language prompt to SQL (requires `ANTHROPIC_API_KEY`) |
-| `/api/ai/status` | GET | No | Whether AI assistant is configured |
-| `/api/cert/question` | POST | Yes | Generate an ENI SQL exam question via Claude (requires `ANTHROPIC_API_KEY`) |
+| `/api/user/data` | GET | Yes | Load user's history + favorites + connections from server |
+| `/api/user/data` | POST | Yes | Save user's history + favorites + connections to server |
+| `/api/user/api-keys` | GET | Yes | Get which AI providers have a key stored (booleans only) |
+| `/api/user/api-keys` | POST | Yes | Store an encrypted API key for a provider |
+| `/api/user/api-keys/:provider` | DELETE | Yes | Remove a stored API key |
+| `/api/ai/sql` | POST | Yes | Translate natural-language prompt to SQL (Anthropic or OpenAI) |
+| `/api/ai/status` | GET | Yes | Whether the user has at least one AI key configured |
+| `/api/cert/question` | POST | Yes | Generate an ENI SQL exam question via Claude |
+| `/api/cert/exam` | POST | Yes | Generate a full 20-question mock exam via Claude |
 | `/api/query` | POST | No | Run SQL on MySQL/MariaDB/PostgreSQL |
 | `/api/tables` | POST | No | List tables for a connection |
 | `/api/columns` | POST | No | List columns for a table |
+| `/api/foreign-keys` | POST | No | List FK relationships |
 | `/api/test-connection` | POST | No | Ping the DB without running a query |
 
 In production, Express also serves the Vite-built frontend as static files.
+
+### `server/apiKeys.ts`
+Handles AES-256-GCM encryption and decryption of user API keys. The encryption key is derived via `scryptSync` from `ENCRYPTION_KEY` env var (or `JWT_SECRET` as fallback). Stored format: base64 of `[12-byte IV][16-byte authTag][ciphertext]`. Raw keys are never written to disk or returned to the browser.
+
+### `server/mailer.ts`
+nodemailer SMTP wrapper for sending password reset emails. Configured via `SMTP_HOST/PORT/USER/PASS/FROM` env vars. If SMTP is not configured, the reset link is printed to the server console instead (useful for self-hosted / local setups).
 
 ### `src/index.css`
 Defines all CSS custom properties (design tokens):

@@ -5,6 +5,85 @@ Most recent entries first.
 
 ---
 
+## [2026] Per-user API keys, encrypted at rest — no server-wide fallback
+
+**Decision:** Users store their own Anthropic and/or OpenAI API keys via Settings → API Keys. Keys are encrypted with AES-256-GCM before being written to `data/users/<username>.json`. The raw key is never returned to the browser — only a boolean indicating presence. No server-side env var fallback: if a user has no key configured, AI features are unavailable for that user.
+
+**Rationale:**
+- The `ANTHROPIC_API_KEY` env var was previously a shared server key, meaning any authenticated user could burn it. Per-user keys give each person full control and accountability
+- Removing the fallback prevents the admin key from being used as a silent crutch — the user must explicitly configure their own key
+- AES-256-GCM provides authenticated encryption (AEAD): tampering with the stored ciphertext is detectable
+- The encryption key is derived via `scryptSync` from `ENCRYPTION_KEY` env var, keeping derivation deterministic across server restarts while still stretching the secret to the required 32 bytes
+- The frontend never needs the raw key — only the server uses it at call time
+
+**Trade-off:**
+- Changing `ENCRYPTION_KEY` invalidates all stored keys — users must re-enter them. This is a deliberate hard failure rather than a silent wrong decryption
+- In-memory key derivation on every encrypt/decrypt call; `scryptSync` is intentionally slow — acceptable given the low frequency of API calls
+
+---
+
+## [2026] Self-registration with file-based user store; in-memory reset tokens
+
+**Decision:** User accounts can be created via the UI when `ALLOW_REGISTRATION=true`. Registered users are stored in `data/auth/users.json` (bcrypt 12 rounds). Password reset tokens are stored in-memory (Map), expire after 1 hour, and are invalidated after use or when a new token is issued for the same user.
+
+**Rationale:**
+- The existing `AUTH_USERS` env var pattern required admin action to create every account — impractical once the tool is shared with a team
+- `data/auth/users.json` follows the same file-based pattern already used for `data/users/<username>.json` — no new infrastructure
+- In-memory tokens are sufficient for a single-instance self-hosted deployment; they auto-expire and require no schema migration
+- One active token per user prevents token accumulation
+
+**Trade-off:**
+- Reset tokens are lost on server restart — users would need to request a new link. Accepted for the target deployment model (low restart frequency)
+- Not suitable for multi-instance deployments (tokens aren't shared between processes); a shared store (Redis, file) would be needed at scale
+
+---
+
+## [2026] Internationalisation (i18n) with i18next — EN and FR
+
+**Decision:** All UI strings are externalised via `i18next` + `react-i18next`. The language preference is stored in Zustand (persisted to localStorage and synced to the server). Language detection falls back to the browser's `navigator.language`.
+
+**Rationale:**
+- The primary target audience includes French-speaking users (ENI SQL certification is French)
+- Externalising strings at the start is cheaper than retrofitting later
+- i18next is the de-facto standard in the React ecosystem; `react-i18next` hooks (`useTranslation`) integrate cleanly with the existing component structure
+
+**Trade-off:**
+- Adds a translation maintenance burden — any new UI string must be added to both `en` and `fr` translation files
+- Machine-translated strings may be imprecise; should be reviewed by a native speaker
+
+---
+
+## [2026] ENI SQL certification prep: server-side generation, client-side evaluation
+
+**Decision:** Exam questions are generated server-side (Claude API, `POST /api/cert/question`). For practical (cas pratique) questions, SQL evaluation happens entirely client-side: the browser runs both the correct SQL and the user's SQL in an isolated, ephemeral `sql.js` database instance (`runSQLiteIsolated`), then compares the result sets.
+
+**Rationale:**
+- Generation needs Claude — keeping the API key on the server is non-negotiable (same pattern as `/api/ai/sql`)
+- Evaluation does **not** need the server: sql.js already runs as WASM in the browser. Creating a fresh `sql.js` `Database()` per question avoids adding a SQLite dependency on the server and avoids round-trips
+- The isolated instance is closed immediately after evaluation — the exam schema never pollutes the user's main database
+- QCU/QCM answers are included in the server response and evaluated client-side (this is a learning tool, not a proctored exam — the trade-off is accepted)
+- Result comparison normalises column order (case-insensitive sort) and row order (lexicographic sort on stringified values), making it ORDER BY-agnostic
+
+**Trade-off:**
+- Technically the user could inspect the network response to see the correct answer for QCU/QCM; acceptable for a self-study context
+- Claude occasionally generates `correctSQL` that does not perfectly match the prose description — no server-side validation of generated questions. If Claude's SQL is wrong the comparison still works (user matches Claude's answer, which may itself be imperfect)
+
+---
+
+## [2026] Settings dropdown replaces individual toolbar buttons for theme, shortcuts, and auth
+
+**Decision:** The keyboard-shortcuts button, theme toggle, and login/logout button are collapsed into a single `⚙️` Settings dropdown in the toolbar.
+
+**Rationale:**
+- The toolbar was growing wide enough to require horizontal scrolling on smaller screens
+- These three actions are infrequent (set once per session) compared to Run, Format, History, AI Help, ENI — burying them one level deeper has minimal UX cost
+- The dropdown pattern already exists in the codebase (Import, Export) — no new pattern needed
+
+**Trade-off:**
+- Theme toggle is now one extra click away; power users who switch themes frequently may prefer the old button. Accepted: the target user switches theme at most once per session
+
+---
+
 ## [2026] ENI SQL certification prep: server-side generation, client-side evaluation
 
 **Decision:** Exam questions are generated server-side (Claude API, `POST /api/cert/question`). For practical (cas pratique) questions, SQL evaluation happens entirely client-side: the browser runs both the correct SQL and the user's SQL in an isolated, ephemeral `sql.js` database instance (`runSQLiteIsolated`), then compares the result sets.
@@ -34,6 +113,20 @@ Most recent entries first.
 
 **Trade-off:**
 - Theme toggle is now one extra click away; power users who switch themes frequently may prefer the old button. Accepted: the target user switches theme at most once per session
+
+---
+
+## [2026] Engine selector: compact dropdown replaces button group
+
+**Decision:** The five engine buttons (SQLite, DuckDB, MySQL, MariaDB, PostgreSQL) in the toolbar were replaced with a single compact dropdown.
+
+**Rationale:**
+- The button group occupied significant horizontal space, especially on narrower screens
+- Five engines is enough that a dropdown is more scalable if more engines are added
+- The active engine label + colour badge still gives immediate visual feedback
+
+**Trade-off:**
+- One extra click to switch engines vs. direct button press; accepted given that engine switching is infrequent during a session
 
 ---
 

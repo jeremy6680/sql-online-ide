@@ -1,6 +1,6 @@
 # SQL Online IDE
 
-A browser-based SQL IDE supporting SQLite, DuckDB, MySQL, MariaDB, and PostgreSQL — no install or sign-up required.
+A browser-based SQL IDE supporting SQLite, DuckDB, MySQL, MariaDB, and PostgreSQL — no install required.
 Inspired by SQLiteOnline, but fully open source and without the limitations of the free tier.
 
 🌐 **Live at [sql.web2data.org](https://sql.web2data.org)**
@@ -15,17 +15,18 @@ Inspired by SQLiteOnline, but fully open source and without the limitations of t
 - 🗑️ **Drop tables** — delete a table directly from the UI without writing SQL
 - 🕘 **Query history** — last 100 queries; synced to the server when logged in (survives cache clears and private browsing)
 - ⭐ **Favorites** — save and name queries for quick reuse; synced to the server when logged in
-- 🔌 **Saved connections** — store MySQL/MariaDB/PostgreSQL connection configs locally
-- 🤖 **AI SQL assistant** — describe what you want in plain language, get a ready-to-run SQL query (requires an Anthropic API key and a user account)
-- 🎓 **ENI SQL Certification Prep** — AI-generated practice questions in the style of the ENI SQL exam (QCU, QCM, and practical cases with auto-correction); requires an Anthropic API key and a user account
+- 🔌 **Saved connections** — store MySQL/MariaDB/PostgreSQL connection configs; synced per-user when logged in
+- 🤖 **AI SQL assistant** — describe what you want in plain language, get a ready-to-run SQL query (Anthropic Claude or OpenAI GPT — requires a user-configured API key)
+- 🎓 **ENI SQL Certification Prep** — AI-generated practice questions in the style of the ENI SQL exam (QCU, QCM, and practical cases with auto-correction); requires an Anthropic API key
 - 📊 **Charts** — visualize results as bar, line, pie, or bubble charts
-- 🔍 **Execution plan** — run `EXPLAIN QUERY PLAN` (SQLite) or `EXPLAIN ANALYZE` (DuckDB) with one click
 - ✨ **Format SQL** — reformat the editor content with a single click, dialect-aware
 - 🔗 **Share query** — copy a shareable URL encoding the current SQL and engine
 - 📥 **Import** — load `.db`, `.sqlite`, `.sqlite3`, `.sql` files, or drop `.csv`, `.json`, `.parquet` directly into DuckDB
 - 📤 **Export** — download query results as `.xlsx` or `.csv`
 - 🌓 **Light / dark theme** — Tokyo Night dark theme + clean light mode
-- 🔐 **Optional authentication** — enable login via `AUTH_USERS` env var; unlocks server-side sync and AI assistant
+- 🌐 **Multilingual** — English and French interface (auto-detected from browser language)
+- 🔐 **User accounts** — self-registration, login by email or username, forgot password with email reset link
+- 🔑 **Per-user API keys** — each user stores their own Anthropic/OpenAI key, encrypted at rest (AES-256-GCM)
 
 ## Getting Started
 
@@ -68,6 +69,9 @@ sql-online-ide/
 │   └── App.tsx
 ├── server/
 │   ├── index.ts          # Express server (port 3001)
+│   ├── auth.ts           # JWT auth, registration, password reset, rate limiting
+│   ├── apiKeys.ts        # AES-256-GCM encryption for user API keys
+│   ├── mailer.ts         # SMTP email sender (password reset)
 │   ├── cert.ts           # ENI SQL certification question generator (Claude API)
 │   ├── mysql.ts          # MySQL / MariaDB routes
 │   └── postgres.ts       # PostgreSQL routes
@@ -90,11 +94,13 @@ sql-online-ide/
 - **Editor** — CodeMirror 6
 - **Charts** — Chart.js + react-chartjs-2
 - **State** — Zustand (with localStorage persistence + optional server sync)
+- **i18n** — i18next + react-i18next (EN + FR)
 - **SQL formatting** — sql-formatter
 - **Export** — xlsx
 - **Backend** — Express, mysql2, pg
-- **Auth** — JWT (jsonwebtoken + bcryptjs)
-- **AI** — Anthropic SDK (claude-haiku-4-5-20251001)
+- **Auth** — JWT (jsonwebtoken + bcryptjs), express-rate-limit
+- **Email** — nodemailer (SMTP)
+- **AI** — Anthropic SDK + OpenAI SDK (per-user keys, AES-256-GCM encrypted)
 
 ## Deployment
 
@@ -140,21 +146,27 @@ Coolify handles SSL (Let's Encrypt) and zero-downtime redeploys on each push to 
 
 ### Environment variables
 
-| Variable            | Default       | Description                                                                                    |
-| ------------------- | ------------- | ---------------------------------------------------------------------------------------------- |
-| `NODE_ENV`          | `development` | Set to `production` to serve the built frontend and enable security headers                    |
-| `PORT`              | `3001`        | Port the Express server listens on                                                             |
-| `AUTH_USERS`        | _(unset)_     | JSON array of `{username, password}` objects. If unset, the app is open to everyone            |
-| `JWT_SECRET`        | _(fallback)_  | Secret used to sign JWT tokens. **Set a strong random value in production**                    |
-| `ANTHROPIC_API_KEY` | _(unset)_     | Anthropic API key for the AI assistant and ENI certification prep. If unset, both buttons are hidden |
+| Variable             | Default       | Description |
+| -------------------- | ------------- | ----------- |
+| `NODE_ENV`           | `development` | Set to `production` to serve the built frontend and enable security headers |
+| `PORT`               | `3001`        | Port the Express server listens on |
+| `AUTH_USERS`         | _(unset)_     | Static users at deploy time: `admin:pass` or JSON `[{"username":"…","password":"…"}]` |
+| `JWT_SECRET`         | _(fallback)_  | Secret used to sign JWT tokens — **set a strong random value in production** |
+| `ALLOW_REGISTRATION` | `false`       | Set to `true` to allow users to self-register via the UI |
+| `ENCRYPTION_KEY`     | _(unset)_     | 32-byte hex key for AES-256-GCM encryption of stored API keys — **required in production** |
+| `SMTP_HOST`          | _(unset)_     | SMTP server hostname (e.g. `smtp.gmail.com`) — enables password reset emails |
+| `SMTP_PORT`          | `587`         | SMTP port |
+| `SMTP_USER`          | _(unset)_     | SMTP login |
+| `SMTP_PASS`          | _(unset)_     | SMTP password (for Gmail: use an App Password) |
+| `SMTP_FROM`          | _(SMTP_USER)_ | Sender address in reset emails |
+| `APP_URL`            | `http://localhost:3001` | Base URL used to build reset links in emails |
 
-**AUTH_USERS formats:**
-```
-# JSON array
-AUTH_USERS=[{"username":"alice","password":"passA"},{"username":"bob","password":"passB"}]
+> If `SMTP_*` is not configured, password reset links are printed to the server console instead — useful for local/self-hosted setups.
 
-# Simple pairs (comma-separated)
-AUTH_USERS=alice:passA,bob:passB
+**Generate secure values:**
+```bash
+# JWT_SECRET and ENCRYPTION_KEY
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 ### Technical requirements
@@ -173,13 +185,10 @@ Cross-Origin-Embedder-Policy: require-corp
 Without these, DuckDB falls back to a slower single-threaded mode.
 
 **Database connectivity for MySQL/MariaDB/PostgreSQL.**
-The remote database engines are proxied through the Express backend. The database server must therefore be reachable from the machine running this app — not from the user's browser. Concretely:
-
-- If both this app and the database run on the same VPS, connect via `localhost` or the internal network.
-- If the database is on a separate host, open the relevant port (3306 for MySQL/MariaDB, 5432 for PostgreSQL) in the firewall and allow the VPS IP.
+The remote database engines are proxied through the Express backend. The database server must therefore be reachable from the machine running this app — not from the user's browser.
 
 **Security note for public deployments.**
-The backend is an open database proxy — it will forward any credentials and SQL provided by the user to any host reachable from the server. This is safe for personal/team use but **should not be exposed publicly without adding authentication** (e.g., HTTP Basic Auth via a reverse proxy, or an application-level auth layer).
+The backend is an open database proxy — it will forward any credentials and SQL provided by the user to any host reachable from the server. This is safe for personal/team use but **should not be exposed publicly without enabling authentication** (`ALLOW_REGISTRATION=true` or `AUTH_USERS`).
 
 ## Contributing
 

@@ -79,3 +79,12 @@ Prioritised backlog. Items at the top of each section are highest priority.
 - [x] Optional multi-user JWT authentication (`LoginPage.tsx`, server-side middleware)
 - [x] Server-side sync for history, favorites, and saved connections
 - [x] AI SQL assistant — plain-language → SQL via Claude API (`AIHelpPanel.tsx`)
+- [x] ENI SQL Certification Prep — AI-generated questions with auto-correction (`CertPanel.tsx`)
+- [x] Multilingual UI — English and French (i18next + react-i18next)
+- [x] Engine selector compact dropdown (replaces button group)
+- [x] Self-registration with email + password (`ALLOW_REGISTRATION=true`)
+- [x] Login by email or username
+- [x] Forgot password / reset password flow (SMTP email or console fallback)
+- [x] Per-user API key storage — Anthropic + OpenAI, encrypted AES-256-GCM (`ApiKeySettings.tsx`)
+- [x] AI provider + model selector in the AI panel (Claude / GPT)
+- [x] Per-user data isolation fix — logout clears local state; server always wins on login
